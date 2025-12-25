@@ -47,7 +47,7 @@ function setButtonStatus(buttonId, status) {
 Telegram.WebApp.ready();
 Telegram.WebApp.expand();
 
-offerActionBtn.addEventListener('click', async () => {
+offerBtn.addEventListener('click', async () => {
     offerCopyBtn.disabled = true;
     offerEmoji.textContent = '🔄';
     offerCopyBtn.classList.add('processing');
@@ -55,7 +55,7 @@ offerActionBtn.addEventListener('click', async () => {
     offerCopyBtn.classList.remove('processing');
 });
 
-answerActionBtn.addEventListener('click', async () => {
+answerBtn.addEventListener('click', async () => {
     answerCopyBtn.disabled = true;
     answerEmoji.textContent = '🔄';
     answerCopyBtn.classList.add('processing');
