@@ -140,6 +140,11 @@ async function setupMedia() {
 async function getLocalOffer() {
     setButtonStatus('offer', 'processing');
     log('🚀 Starting OFFER creation');
+    if (pc) {
+        pc.close();
+        pc = null;
+    }
+    
     const mediaReady = await setupMedia();
     if (!mediaReady) return;
     
@@ -183,25 +188,15 @@ async function getLocalOffer() {
         // FIXED: Wait for FULL ICE gathering (3 seconds max)
         log('⏳ Waiting for complete ICE gathering...');
         await new Promise(resolve => {
-            if (pc.iceGatheringState === 'complete') {
-                log('✅ ICE already complete');
-                resolve();
-            } else {
-                const timeout = setTimeout(() => {
-                    log('⚠️ ICE timeout - using partial candidates');
+            const checkIce = setInterval(() => {
+                if (pc.iceGatheringState === 'complete') {
+                    clearInterval(checkIce);
+                    clearTimeout(timeout);
+                        updateCopyData('offer');
+                    log('✅ ICE gathering complete');
                     resolve();
-                }, 3000);
-                
-                const checkIce = setInterval(() => {
-                    if (pc.iceGatheringState === 'complete') {
-                        clearInterval(checkIce);
-                        clearTimeout(timeout);
-                         updateCopyData('offer');
-                        log('✅ ICE gathering complete');
-                        resolve();
-                    }
-                }, 200);
-            }
+                }
+            }, 200);
         });
         
         updateCopyData();
@@ -260,6 +255,10 @@ function decodeChunks(rawData, expectedType) {
 async function getLocalAnswer() {
     setButtonStatus('answer', 'processing');
     log('🔄 Starting ANSWER creation');
+    if (pc) {
+        pc.close();
+        pc = null;
+    }
     try {
         const rawData = pasteEl.value.trim();
         if (!rawData) throw new Error('Empty paste data');
@@ -322,6 +321,12 @@ async function useRemoteData() {
         if (!pc) {
             log('❌ No peer connection - create offer first');
             statusEl.textContent = '❌ Create offer first';
+            return;
+        }
+
+        if (pc.signalingState !== 'have-local-offer') {
+            log(`❌ Wrong state: ${pc.signalingState}, expected 'have-local-offer'`);
+            statusEl.textContent = `❌ Wrong state: ${pc.signalingState}. Create new offer first`;
             return;
         }
         
