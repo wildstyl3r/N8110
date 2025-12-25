@@ -129,32 +129,64 @@
             iceServers: [{urls: 'stun:stun.l.google.com:19302'}] 
         };
 
+        <!-- Replace the setupMedia() and getLocalOffer() functions with these: -->
+
         async function setupMedia() {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480, facingMode: 'user' }, 
-                audio: true 
-            });
-            document.getElementById('localVideo').srcObject = localStream;
+            try {
+                statusEl.textContent = 'Requesting camera permission...';
+                
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        width: { ideal: 640 }, 
+                        height: { ideal: 480 }, 
+                        facingMode: 'user' 
+                    }, 
+                    audio: true 
+                });
+                
+                document.getElementById('localVideo').srcObject = localStream;
+                statusEl.textContent = '✅ Camera ready';
+                return true;
+            } catch (err) {
+                console.error('Camera error:', err);
+                statusEl.textContent = `❌ Camera denied: ${err.name}`;
+                if (err.name === 'NotAllowedError') {
+                    statusEl.textContent += '\nPlease enable camera in browser permissions';
+                }
+                return false;
+            }
         }
 
         async function getLocalOffer() {
-            statusEl.textContent = 'Setting up camera...';
-            await setupMedia();
+            const mediaReady = await setupMedia();
+            if (!mediaReady) return;
             
-            pc = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-            
-            pc.ontrack = e => {
-                document.getElementById('remoteVideo').srcObject = e.streams[0];
-                statusEl.textContent = '✅ Connected! Video incoming';
-            };
-            
-            pc.onicecandidate = updateCopyData;
-            
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            statusEl.textContent = '✅ Offer ready! Copy & send to peer';
+            try {
+                statusEl.textContent = 'Creating connection...';
+                pc = new RTCPeerConnection(config);
+                
+                // Add tracks only after camera is confirmed working
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+                
+                pc.ontrack = e => {
+                    document.getElementById('remoteVideo').srcObject = e.streams[0];
+                    statusEl.textContent = '✅ Waiting for peer video...';
+                };
+                
+                pc.onicecandidate = () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        updateCopyData();
+                    }
+                };
+                
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+            } catch (err) {
+                statusEl.textContent = `❌ Setup failed: ${err.message}`;
+            }
         }
+
 
         async function getLocalAnswer() {
             try {
