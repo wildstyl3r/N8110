@@ -179,6 +179,7 @@ function decodeChunks(rawData, expectedType) {
             base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
             const padding = (4 - (base64.length % 4)) % 4;
             base64 += '='.repeat(padding);
+            log(`padded successfully`);
             
             const decoded = atob(base64);
             log(`debased successfully: ${decoded.slice(Math.max(decoded.length - 5, 1))}`);
