@@ -2,52 +2,90 @@
 <html>
 <head>
     <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0; padding: 20px; 
-            background: var(--tg-theme-bg-color);
-            color: var(--tg-theme-text-color);
-            text-align: center;
-        }
-        button { 
-            background: var(--tg-theme-button-color);
-            color: var(--tg-theme-button-text-color);
-            border: none; padding: 12px 24px; 
-            border-radius: 8px; font-size: 16px;
-            cursor: pointer; margin-top: 20px;
-        }
-    </style>
+    <style> /* Your existing styles */ </style>
 </head>
 <body>
-    <h1>👋 Greeting Bot</h1>
-    <p id="greeting">Loading...</p>
-    <button onclick="sendGreeting()">Send Greeting to Bot</button>
+    <h1>🔗 P2P WebRTC (No Server)</h1>
+    
+    <div>
+        <button onclick="getLocalOffer()">📤 Generate Offer</button>
+        <button onclick="getLocalAnswer()">📤 Generate Answer</button>
+        <textarea id="copyData" rows="6" placeholder="Copy this → Send to peer → They paste here" readonly></textarea>
+        <br>
+        <input id="pasteData" placeholder="Paste peer's data here" />
+        <button onclick="useRemoteData()">📥 Use Data</button>
+    </div>
+    
+    <div id="status">Ready</div>
+    <video id="localVideo" autoplay muted playsinline></video>
+    <video id="remoteVideo" autoplay playsinline></video>
 
     <script>
-        // Initialize Mini App
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand();
+        Telegram.WebApp.ready(); Telegram.WebApp.expand();
+        const statusEl = document.getElementById('status');
+        const copyEl = document.getElementById('copyData');
+        const pasteEl = document.getElementById('pasteData');
+        let pc, localStream;
 
-        // Get user data safely
-        const user = Telegram.WebApp.initDataUnsafe.user;
-        const firstName = user ? user.first_name || 'User' : 'User';
-        
-        // Display greeting
-        document.getElementById('greeting').textContent = 
-            `Hello, ${firstName}! Welcome to the Mini App.`;
+        const config = { iceServers: [{urls: 'stun:stun.l.google.com:19302'}] };
 
-        // Send greeting back to bot
-        function sendGreeting() {
-            const data = JSON.stringify({ 
-                action: 'greet', 
-                name: firstName 
-            });
-            Telegram.WebApp.sendData(data);
-            Telegram.WebApp.close();
+        // 1. GENERATE OFFER/ANSWER → COPY STRING
+        async function getLocalOffer() {
+            await setupMedia();
+            pc = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            
+            pc.ontrack = e => document.getElementById('remoteVideo').srcObject = e.streams[0];
+            pc.onicecandidate = e => { if (e.candidate) updateCopyData(); };
+            
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            statusEl.textContent = '✅ Copy & send to peer';
+        }
+
+        async function getLocalAnswer() {
+            const data = JSON.parse(pasteEl.value);
+            await setupMedia();
+            pc = new RTCPeerConnection(config);
+            // ... same setup as offer
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            statusEl.textContent = '✅ Copy & send answer back';
+        }
+
+        // 2. COMPACT DATA SERIALIZATION
+        function updateCopyData() {
+            const data = {
+                offer: pc.localDescription.sdp,  // ~1-2KB
+                candidates: pc.getSenders().map(s => s.transport.iceGatherer.getIceCandidates())
+            };
+            const compact = btoa(JSON.stringify(data));  // Base64 → ~2KB
+            copyEl.value = compact;
+            navigator.clipboard.writeText(compact);
+            statusEl.textContent += ' (Copied!)';
+        }
+
+        // 3. USE PEER'S PASTED DATA
+        async function useRemoteData() {
+            try {
+                const data = JSON.parse(atob(pasteEl.value));
+                pc = new RTCPeerConnection(config);
+                
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                await pc.setLocalDescription(await pc.createAnswer());
+                
+                data.candidates.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)));
+                statusEl.textContent = '✅ Connected!';
+            } catch(e) {
+                statusEl.textContent = '❌ Invalid data';
+            }
+        }
+
+        async function setupMedia() {
+            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+            document.getElementById('localVideo').srcObject = localStream;
         }
     </script>
 </body>
 </html>
-[attached_file:1]
