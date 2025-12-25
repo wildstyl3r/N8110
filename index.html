@@ -91,8 +91,10 @@
         <h1>🔗 P2P WebRTC Call</h1>
         
         <div>
-            <button onclick="getLocalOffer()">📤 1. Create Offer</button>
-            <button onclick="getLocalAnswer()">📤 2. Create Answer</button>
+            <!-- Make buttons also copy when offer/answer ready -->
+            <button onclick="getLocalOffer()" id="offerBtn">📤 Create Offer</button>
+            <button onclick="getLocalAnswer()" id="answerBtn">📤 Create Answer</button>
+
         </div>
         
         <textarea id="copyData" 
@@ -135,6 +137,53 @@
         const config = { 
             iceServers: [{urls: 'stun:stun.l.google.com:19302'}] 
         };
+
+        async function copyToClipboard() {
+            const copyEl = document.getElementById('copyData');
+            const feedbackEl = document.getElementById('copyFeedback');
+            
+            if (copyEl.value) {
+                try {
+                    await navigator.clipboard.writeText(copyEl.value);
+                    
+                    // Telegram haptic feedback
+                    if (Telegram.WebApp.HapticFeedback) {
+                        Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                    }
+                    
+                    // Visual feedback
+                    feedbackEl.textContent = '✅ Copied to clipboard!';
+                    feedbackEl.style.display = 'block';
+                    setTimeout(() => { feedbackEl.style.display = 'none'; }, 2000);
+                    
+                } catch (err) {
+                    feedbackEl.textContent = '❌ Copy failed';
+                    feedbackEl.style.display = 'block';
+                }
+            }
+        }
+        // Auto-copy styling for buttons
+        document.getElementById('offerBtn').addEventListener('click', () => {
+            setTimeout(() => {
+                if (document.getElementById('copyData').value) {
+                    copyToClipboard();
+                }
+            }, 1500); // After ICE gathering
+        });
+
+
+        // Update updateCopyData() to trigger auto-copy
+        function updateCopyData() {
+            if (!pc || !pc.localDescription) return;
+            
+            const data = { sdp: pc.localDescription.sdp };
+            const compact = btoa(JSON.stringify(data));
+            document.getElementById('copyData').value = compact;
+            
+            // Auto-copy immediately
+            copyToClipboard();
+        }
+
 
         async function setupMedia() {
             try {
