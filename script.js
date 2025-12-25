@@ -181,6 +181,7 @@ function decodeChunks(rawData, expectedType) {
             base64 += '='.repeat(padding);
             
             const decoded = atob(base64);
+            log('debased successfully');
             const chunkData = JSON.parse(decoded);
             
             // Validate
@@ -316,7 +317,7 @@ function updateCopyData() {
         base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         
         chunks.push(base64);
-        log(`${i}th chunk lenght = ${base64.length}`)
+        log(`${data.chunk + 1}th chunk lenght = ${base64.length}`)
     }
     
     const copyText = chunks.join('\n---\n');
