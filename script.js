@@ -177,7 +177,7 @@ function decodeChunks(rawData, expectedType) {
             // URL-safe base64 → standard base64
             let base64 = line;
             base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
-            const padding = 4 - (base64.length % 4);
+            const padding = (4 - (base64.length % 4)) % 4;
             base64 += '='.repeat(padding);
             
             const decoded = atob(base64);
