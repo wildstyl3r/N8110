@@ -2,90 +2,224 @@
 <html>
 <head>
     <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
-    <style> /* Your existing styles */ </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 20px; 
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            min-height: 100vh;
+            text-align: center;
+            line-height: 1.4;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: var(--tg-theme-text-color);
+        }
+        button { 
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff) !important;
+            border: none; 
+            padding: 14px 20px; 
+            border-radius: 12px; 
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer; 
+            margin: 8px;
+            width: 100%;
+            max-width: 320px;
+            transition: all 0.2s ease;
+            user-select: none;
+            -webkit-appearance: none;
+        }
+        button:hover {
+            background: var(--tg-theme-button-color);
+            opacity: 0.9;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        textarea, input {
+            width: 100%; max-width: 400px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--tg-theme-hint-color, #c7c7c7);
+            background: var(--tg-theme-secondary-bg-color, #f8f8f8);
+            color: var(--tg-theme-text-color);
+            font-size: 15px;
+            margin: 8px 0;
+            resize: vertical;
+            font-family: inherit;
+        }
+        textarea {
+            min-height: 120px;
+            font-size: 14px;
+        }
+        textarea[readonly] {
+            background: var(--tg-theme-hint-color);
+            opacity: 0.7;
+        }
+        #status { 
+            padding: 16px;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-weight: 500;
+            background: var(--tg-theme-secondary-bg-color);
+            border: 1px solid var(--tg-theme-hint-color);
+        }
+        video { 
+            width: 100%; 
+            max-height: 200px; 
+            border-radius: 12px; 
+            margin: 12px 0;
+            background: var(--tg-theme-hint-color);
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+    </style>
 </head>
 <body>
-    <h1>🔗 P2P WebRTC (No Server)</h1>
-    
-    <div>
-        <button onclick="getLocalOffer()">📤 Generate Offer</button>
-        <button onclick="getLocalAnswer()">📤 Generate Answer</button>
-        <textarea id="copyData" rows="6" placeholder="Copy this → Send to peer → They paste here" readonly></textarea>
-        <br>
-        <input id="pasteData" placeholder="Paste peer's data here" />
-        <button onclick="useRemoteData()">📥 Use Data</button>
+    <div class="container">
+        <h1>🔗 P2P WebRTC Call</h1>
+        
+        <div>
+            <button onclick="getLocalOffer()">📤 1. Create Offer</button>
+            <button onclick="getLocalAnswer()">📤 2. Create Answer</button>
+        </div>
+        
+        <textarea id="copyData" placeholder="Your offer/answer will appear here. Copy & send to peer via Telegram!" readonly></textarea>
+        
+        <div>
+            <input id="pasteData" placeholder="Paste peer's offer/answer here..." />
+            <button onclick="useRemoteData()">📥 3. Use Data</button>
+        </div>
+        
+        <div id="status">Ready to create an offer</div>
+        
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
     </div>
-    
-    <div id="status">Ready</div>
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
 
     <script>
-        Telegram.WebApp.ready(); Telegram.WebApp.expand();
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+        
+        // Dynamic theme matching
+        document.documentElement.style.setProperty('--tg-theme-bg-color', Telegram.WebApp.themeParams.bg_color);
+        document.documentElement.style.setProperty('--tg-theme-text-color', Telegram.WebApp.themeParams.text_color);
+        document.documentElement.style.setProperty('--tg-theme-button-color', Telegram.WebApp.themeParams.button_color);
+        document.documentElement.style.setProperty('--tg-theme-button-text-color', Telegram.WebApp.themeParams.button_text_color);
+        document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', Telegram.WebApp.themeParams.secondary_bg_color);
+        document.documentElement.style.setProperty('--tg-theme-hint-color', Telegram.WebApp.themeParams.hint_color);
+
         const statusEl = document.getElementById('status');
         const copyEl = document.getElementById('copyData');
         const pasteEl = document.getElementById('pasteData');
         let pc, localStream;
 
-        const config = { iceServers: [{urls: 'stun:stun.l.google.com:19302'}] };
+        const config = { 
+            iceServers: [{urls: 'stun:stun.l.google.com:19302'}] 
+        };
 
-        // 1. GENERATE OFFER/ANSWER → COPY STRING
+        async function setupMedia() {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480, facingMode: 'user' }, 
+                audio: true 
+            });
+            document.getElementById('localVideo').srcObject = localStream;
+        }
+
         async function getLocalOffer() {
+            statusEl.textContent = 'Setting up camera...';
             await setupMedia();
+            
             pc = new RTCPeerConnection(config);
             localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
             
-            pc.ontrack = e => document.getElementById('remoteVideo').srcObject = e.streams[0];
-            pc.onicecandidate = e => { if (e.candidate) updateCopyData(); };
+            pc.ontrack = e => {
+                document.getElementById('remoteVideo').srcObject = e.streams[0];
+                statusEl.textContent = '✅ Connected! Video incoming';
+            };
+            
+            pc.onicecandidate = updateCopyData;
             
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            statusEl.textContent = '✅ Copy & send to peer';
+            statusEl.textContent = '✅ Offer ready! Copy & send to peer';
         }
 
         async function getLocalAnswer() {
-            const data = JSON.parse(pasteEl.value);
-            await setupMedia();
-            pc = new RTCPeerConnection(config);
-            // ... same setup as offer
-            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            statusEl.textContent = '✅ Copy & send answer back';
-        }
-
-        // 2. COMPACT DATA SERIALIZATION
-        function updateCopyData() {
-            const data = {
-                offer: pc.localDescription.sdp,  // ~1-2KB
-                candidates: pc.getSenders().map(s => s.transport.iceGatherer.getIceCandidates())
-            };
-            const compact = btoa(JSON.stringify(data));  // Base64 → ~2KB
-            copyEl.value = compact;
-            navigator.clipboard.writeText(compact);
-            statusEl.textContent += ' (Copied!)';
-        }
-
-        // 3. USE PEER'S PASTED DATA
-        async function useRemoteData() {
             try {
-                const data = JSON.parse(atob(pasteEl.value));
+                const remoteData = JSON.parse(atob(pasteEl.value));
+                statusEl.textContent = 'Setting up...';
+                
+                await setupMedia();
                 pc = new RTCPeerConnection(config);
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
                 
-                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                await pc.setLocalDescription(await pc.createAnswer());
+                pc.ontrack = e => document.getElementById('remoteVideo').srcObject = e.streams[0];
+                pc.onicecandidate = updateCopyData;
                 
-                data.candidates.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)));
-                statusEl.textContent = '✅ Connected!';
+                await pc.setRemoteDescription(new RTCSessionDescription({type: 'offer', sdp: remoteData.sdp}));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                statusEl.textContent = '✅ Answer ready! Copy & send back';
             } catch(e) {
-                statusEl.textContent = '❌ Invalid data';
+                statusEl.textContent = '❌ Invalid data pasted';
             }
         }
 
-        async function setupMedia() {
-            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-            document.getElementById('localVideo').srcObject = localStream;
+        function updateCopyData() {
+            if (!pc || !pc.localDescription) return;
+            
+            const data = {
+                sdp: pc.localDescription.sdp,
+                candidates: Array.from(pc.getSenders()).map(s => s.transport?.iceGatherer?.getIceCandidates?.() || [])
+            };
+            
+            const compact = btoa(JSON.stringify(data));
+            copyEl.value = compact;
+            navigator.clipboard.writeText(compact).then(() => {
+                statusEl.textContent += ' (Copied to clipboard!)';
+            });
         }
+
+        async function useRemoteData() {
+            try {
+                const data = JSON.parse(atob(pasteEl.value));
+                if (!pc) {
+                    await setupMedia();
+                    pc = new RTCPeerConnection(config);
+                    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+                    pc.ontrack = e => document.getElementById('remoteVideo').srcObject = e.streams[0];
+                }
+                
+                await pc.setRemoteDescription(new RTCSessionDescription({type: 'answer', sdp: data.sdp}));
+                data.candidates.forEach(candidates => {
+                    candidates.forEach(candidate => {
+                        if (candidate) pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    });
+                });
+                statusEl.textContent = '✅ Data applied! Check video';
+            } catch(e) {
+                statusEl.textContent = '❌ Invalid data format';
+            }
+        }
+
+        // Auto-expand and theme updates
+        Telegram.WebApp.onEvent('themeChanged', () => {
+            document.documentElement.style.setProperty('--tg-theme-bg-color', Telegram.WebApp.themeParams.bg_color);
+            document.documentElement.style.setProperty('--tg-theme-text-color', Telegram.WebApp.themeParams.text_color);
+            // ... other theme params
+        });
     </script>
 </body>
 </html>
