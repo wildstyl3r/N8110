@@ -95,7 +95,14 @@
             <button onclick="getLocalAnswer()">📤 2. Create Answer</button>
         </div>
         
-        <textarea id="copyData" placeholder="Your offer/answer will appear here. Copy & send to peer via Telegram!" readonly></textarea>
+        <textarea id="copyData" 
+                placeholder="Tap to copy!" 
+                readonly 
+                onclick="copyToClipboard()"
+                onfocus="copyToClipboard()"></textarea>
+
+        <!-- Add copy feedback -->
+        <div id="copyFeedback" style="display:none; padding:12px; border-radius:12px; background:var(--tg-theme-button-color); color:var(--tg-theme-button-text-color); margin:8px 0; font-weight:500;"></div>
         
         <div>
             <input id="pasteData" placeholder="Paste peer's offer/answer here..." />
@@ -128,8 +135,6 @@
         const config = { 
             iceServers: [{urls: 'stun:stun.l.google.com:19302'}] 
         };
-
-        <!-- Replace the setupMedia() and getLocalOffer() functions with these: -->
 
         async function setupMedia() {
             try {
