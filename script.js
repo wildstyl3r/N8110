@@ -177,8 +177,8 @@ function decodeChunks(rawData, expectedType) {
             // URL-safe base64 → standard base64
             let base64 = line;
             base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
-            const padding = base64.length % 4;
-            if (padding) base64 += '='.repeat(4 - padding);
+            const padding = 4 - (base64.length % 4);
+            base64 += '='.repeat(padding);
             
             const decoded = atob(base64);
             const chunkData = JSON.parse(decoded);
