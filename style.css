@@ -114,15 +114,6 @@ video {
     border: 1px solid var(--tg-theme-hint-color);
 }
 
-.feedback {
-    padding: 12px; 
-    border-radius: 12px; 
-    margin: 8px 0; 
-    font-weight: 500;
-    background: var(--tg-theme-button-color) !important; 
-    color: var(--tg-theme-button-text-color) !important;
-}
-
 .input-group {
     align-items: center;
 }
@@ -145,4 +136,22 @@ video {
     .input-group button {
         max-width: 100%;
     }
+}
+button .emoji {
+    margin-left: 8px;
+    font-size: 18px;
+    transition: all 0.2s ease;
+}
+
+button.processing .emoji {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+button.success .emoji {
+    color: #4CAF50;
 }

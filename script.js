@@ -5,14 +5,37 @@ let DEBUG = true;
 
 // DOM elements
 const statusEl = document.getElementById('status');
-const copyEl = document.getElementById('copyData');
 const pasteEl = document.getElementById('pasteData');
 const debugLogEl = document.getElementById('debugLog');
-const copyFeedbackEl = document.getElementById('copyFeedback');
 const offerBtn = document.getElementById('offerBtn');
 const answerBtn = document.getElementById('answerBtn');
 const useDataBtn = document.getElementById('useDataBtn');
 const debugBtn = document.getElementById('debugBtn');
+
+const offerEmoji = document.querySelector('#offerBtn .emoji');
+const answerEmoji = document.querySelector('#answerBtn .emoji');
+const useDataEmoji = document.querySelector('#useDataBtn .emoji');
+
+function setButtonStatus(buttonId, status) {
+    const emoji = {
+        'offer': offerEmoji,
+        'answer': answerEmoji,
+        'use': useDataEmoji
+    }[buttonId];
+    
+    if (!emoji) return;
+    
+    emoji.textContent = status === 'processing' ? '🔄' : 
+                       status === 'success' ? '✅' : '🌐';
+    
+    const button = document.getElementById(
+        buttonId === 'offer' ? 'offerBtn' :
+        buttonId === 'answer' ? 'answerBtn' : 'useDataBtn'
+    );
+    
+    button.className = status === 'processing' ? 'processing' : 
+                      status === 'success' ? 'success' : '';
+}
 
 // Initialize Telegram Mini App
 Telegram.WebApp.ready();
@@ -47,27 +70,6 @@ debugBtn.addEventListener('click', () => {
     debugLogEl.style.display = debugLogEl.style.display === 'none' ? 'block' : 'none';
 });
 
-// Auto-copy functionality
-copyEl.addEventListener('click', copyToClipboard);
-copyEl.addEventListener('focus', copyToClipboard);
-
-async function copyToClipboard() {
-    if (copyEl.value) {
-        try {
-            await navigator.clipboard.writeText(copyEl.value);
-            if (Telegram.WebApp.HapticFeedback) {
-                Telegram.WebApp.HapticFeedback.impactOccurred('light');
-            }
-            copyFeedbackEl.textContent = '✅ Copied to clipboard!';
-            copyFeedbackEl.style.display = 'block';
-            setTimeout(() => { copyFeedbackEl.style.display = 'none'; }, 2000);
-        } catch (err) {
-            copyFeedbackEl.textContent = '❌ Copy failed';
-            copyFeedbackEl.style.display = 'block';
-        }
-    }
-}
-
 // FIXED: Proper media setup
 async function setupMedia() {
     log('🔄 Stage 1: Requesting camera...');
@@ -89,6 +91,7 @@ async function setupMedia() {
 
 // FIXED: Proper ICE gathering + DTLS roles
 async function getLocalOffer() {
+    setButtonStatus('offer', 'processing');
     log('🚀 Starting OFFER creation');
     const mediaReady = await setupMedia();
     if (!mediaReady) return;
@@ -207,6 +210,7 @@ function decodeChunks(rawData, expectedType) {
 }
 
 async function getLocalAnswer() {
+    setButtonStatus('answer', 'processing');
     log('🔄 Starting ANSWER creation');
     try {
         const rawData = pasteEl.value.trim();
@@ -250,6 +254,7 @@ async function getLocalAnswer() {
     } catch (err) {
         log(`❌ ANSWER FAILED: ${err.message}`);
         statusEl.textContent = `❌ Invalid data: ${err.message}`;
+        setButtonStatus('answer', '');
     }
 }
 
@@ -257,6 +262,7 @@ async function getLocalAnswer() {
 answerBtn.addEventListener('click', getLocalAnswer);
 
 async function useRemoteData() {
+    setButtonStatus('use', 'processing');
     log('🔄 Using remote ANSWER');
     try {
         const rawData = pasteEl.value.trim();
@@ -279,8 +285,24 @@ async function useRemoteData() {
     } catch (err) {
         log(`❌ USE DATA FAILED: ${err.message}`);
         statusEl.textContent = `❌ Use failed: ${err.message}`;
+        setButtonStatus('use', '');
     }
 }
+
+offerBtn.addEventListener('click', async () => {
+    setButtonStatus('offer', 'processing');
+    await getLocalOffer();
+});
+
+answerBtn.addEventListener('click', async () => {
+    setButtonStatus('answer', 'processing');
+    await getLocalAnswer();
+});
+
+useDataBtn.addEventListener('click', async () => {
+    setButtonStatus('use', 'processing');
+    await useRemoteData();
+});
 
 
 
@@ -322,14 +344,15 @@ function updateCopyData() {
     }
     
     const copyText = chunks.join('!!!');
-    copyEl.value = copyText;
     
     navigator.clipboard.writeText(copyText).then(() => {
-        log('✅ URL-safe SDP copied', { chunks: chunks.length });
-        copyFeedbackEl.textContent = `✅ Copied ${chunks.length} chunks! (URL-safe)`;
-        copyFeedbackEl.style.display = 'block';
-        setTimeout(() => copyFeedbackEl.style.display = 'none', 3000);
+        log('✅ Auto-copied', { chunks: chunks.length });
+        const type = pc.localDescription.type;
+        setButtonStatus(type, 'success');
+        statusEl.textContent = `${type.toUpperCase()} ready! ${chunks.length} chunks! 📋 `;
+    }).catch(err => {
+        log('❌ Auto-copy failed', err);
+        statusEl.textContent = '❌ Copy failed - try manually';
+        setButtonStatus(pc.localDescription.type, '');
     });
-    
-    statusEl.textContent = `✅ ${pc.localDescription.type.toUpperCase()} (${chunks.length} chunks)`;
 }
