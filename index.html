@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 20px; 
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            text-align: center;
+        }
+        button { 
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none; padding: 12px 24px; 
+            border-radius: 8px; font-size: 16px;
+            cursor: pointer; margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>👋 Greeting Bot</h1>
+    <p id="greeting">Loading...</p>
+    <button onclick="sendGreeting()">Send Greeting to Bot</button>
+
+    <script>
+        // Initialize Mini App
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+
+        // Get user data safely
+        const user = Telegram.WebApp.initDataUnsafe.user;
+        const firstName = user ? user.first_name || 'User' : 'User';
+        
+        // Display greeting
+        document.getElementById('greeting').textContent = 
+            `Hello, ${firstName}! Welcome to the Mini App.`;
+
+        // Send greeting back to bot
+        function sendGreeting() {
+            const data = JSON.stringify({ 
+                action: 'greet', 
+                name: firstName 
+            });
+            Telegram.WebApp.sendData(data);
+            Telegram.WebApp.close();
+        }
+    </script>
+</body>
+</html>
+[attached_file:1]
