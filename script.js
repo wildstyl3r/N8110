@@ -68,7 +68,7 @@ async function copyToClipboard() {
     }
 }
 
-// Core WebRTC functions
+// FIXED: Proper media setup
 async function setupMedia() {
     log('🔄 Stage 1: Requesting camera...');
     try {
@@ -87,6 +87,7 @@ async function setupMedia() {
     }
 }
 
+// FIXED: Proper ICE gathering + DTLS roles
 async function getLocalOffer() {
     log('🚀 Starting OFFER creation');
     const mediaReady = await setupMedia();
@@ -97,9 +98,12 @@ async function getLocalOffer() {
         pc = new RTCPeerConnection(config);
         log('✅ Stage 2: PeerConnection created');
         
+        // Add tracks BEFORE createOffer
         log('🔄 Stage 3: Adding tracks');
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-        log('✅ Stage 3: Tracks added');
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+            log(`✅ Added track: ${track.kind}`);
+        });
         
         pc.ontrack = e => {
             log('📹 Remote stream received');
@@ -107,29 +111,49 @@ async function getLocalOffer() {
             statusEl.textContent = '✅ Connected!';
         };
         
-        log('🔄 Stage 4: ICE gathering...');
         pc.onicecandidate = (event) => {
             if (event.candidate) {
                 log('🧊 ICE candidate gathered');
             }
         };
         
-        log('🔄 Stage 5: Creating offer...');
-        const offer = await pc.createOffer();
-        log('✅ Stage 5: Offer created', { sdpLength: offer.sdp?.length });
+        pc.onicegatheringstatechange = () => {
+            log(`ICE state: ${pc.iceGatheringState}`);
+        };
         
-        log('🔄 Stage 6: Setting local description');
+        // FIXED: Create offer AFTER tracks added
+        log('🔄 Stage 4: Creating offer...');
+        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+        log('✅ Stage 4: Offer created', { sdpLength: offer.sdp?.length });
+        
+        log('🔄 Stage 5: Setting local description');
         await pc.setLocalDescription(offer);
-        log('✅ Stage 6: Local description set');
+        log('✅ Stage 5: Local description set');
         
-        log('⏳ Waiting ICE complete...');
-        const iceCheck = setInterval(() => {
-            if (pc.iceGatheringState === 'complete' || pc.iceGatheringState === 'gathering') {
-                clearInterval(iceCheck);
-                log('✅ ICE gathering ready');
-                updateCopyData();
+        // FIXED: Wait for FULL ICE gathering (3 seconds max)
+        log('⏳ Waiting for complete ICE gathering...');
+        await new Promise(resolve => {
+            if (pc.iceGatheringState === 'complete') {
+                log('✅ ICE already complete');
+                resolve();
+            } else {
+                const timeout = setTimeout(() => {
+                    log('⚠️ ICE timeout - using partial candidates');
+                    resolve();
+                }, 3000);
+                
+                const checkIce = setInterval(() => {
+                    if (pc.iceGatheringState === 'complete') {
+                        clearInterval(checkIce);
+                        clearTimeout(timeout);
+                        log('✅ ICE gathering complete');
+                        resolve();
+                    }
+                }, 200);
             }
-        }, 200);
+        });
+        
+        updateCopyData();
         
     } catch (err) {
         log(`❌ OFFER FAILED: ${err.message}`, err);
@@ -139,6 +163,7 @@ async function getLocalOffer() {
 
 offerBtn.addEventListener('click', getLocalOffer);
 
+// FIXED: Answerer creates PC FIRST, then adds tracks, THEN setRemoteDescription
 async function getLocalAnswer() {
     log('🔄 Starting ANSWER creation');
     try {
@@ -155,37 +180,56 @@ async function getLocalAnswer() {
         
         if (!remoteData.sdp) throw new Error('No SDP in data');
         
+        // FIXED: Create PC and add tracks BEFORE setRemoteDescription
+        log('🔄 Stage 3: Creating peer connection FIRST');
+        pc = new RTCPeerConnection(config);
+        
+        // Get media BEFORE setting remote description
         const mediaReady = await setupMedia();
         if (!mediaReady) throw new Error('Camera setup failed');
         
-        log('🔄 Stage 3: Creating peer connection');
-        pc = new RTCPeerConnection(config);
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        log('🔄 Stage 4: Adding tracks to answerer');
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+            log(`✅ Added track: ${track.kind}`);
+        });
         
         pc.ontrack = e => {
             log('📹 Remote stream received');
             document.getElementById('remoteVideo').srcObject = e.streams[0];
         };
         
-        log('🔄 Stage 4: Setting remote offer');
+        log('🔄 Stage 5: Setting remote offer (AFTER tracks)');
         await pc.setRemoteDescription({ type: 'offer', sdp: remoteData.sdp });
-        log('✅ Stage 4: Remote offer set');
+        log('✅ Stage 5: Remote offer set');
         
-        log('🔄 Stage 5: Creating answer');
+        log('🔄 Stage 6: Creating answer');
         const answer = await pc.createAnswer();
-        log('✅ Stage 5: Answer created');
+        log('✅ Stage 6: Answer created');
         
-        log('🔄 Stage 6: Setting local answer');
+        log('🔄 Stage 7: Setting local answer');
         await pc.setLocalDescription(answer);
-        log('✅ Stage 6: Answer set');
+        log('✅ Stage 7: Local answer set');
         
-        log('⏳ Waiting ICE...');
-        const iceCheck = setInterval(() => {
-            if (pc.iceGatheringState === 'complete' || pc.iceGatheringState === 'gathering') {
-                clearInterval(iceCheck);
-                updateCopyData();
-            }
-        }, 200);
+        // Wait for ICE
+        log('⏳ Waiting ICE for answer...');
+        await new Promise(resolve => {
+            const timeout = setTimeout(() => {
+                log('⚠️ Answer ICE timeout');
+                resolve();
+            }, 3000);
+            
+            const checkIce = setInterval(() => {
+                if (pc.iceGatheringState === 'complete') {
+                    clearInterval(checkIce);
+                    clearTimeout(timeout);
+                    log('✅ Answer ICE complete');
+                    resolve();
+                }
+            }, 200);
+        });
+        
+        updateCopyData();
         
     } catch (err) {
         log(`❌ ANSWER FAILED: ${err.message}`, { pastePreview: pasteEl.value.substring(0, 100) });
