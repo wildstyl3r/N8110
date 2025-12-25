@@ -181,7 +181,7 @@ function decodeChunks(rawData, expectedType) {
             base64 += '='.repeat(padding);
             
             const decoded = atob(base64);
-            log('debased successfully');
+            log(`debased successfully: ${decoded}`);
             const chunkData = JSON.parse(decoded);
             
             // Validate
