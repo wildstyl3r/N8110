@@ -163,76 +163,61 @@ async function getLocalOffer() {
 
 offerBtn.addEventListener('click', getLocalOffer);
 
-// FIXED: Answerer creates PC FIRST, then adds tracks, THEN setRemoteDescription
 async function getLocalAnswer() {
     log('🔄 Starting ANSWER creation');
     try {
         const rawData = pasteEl.value.trim();
         if (!rawData) throw new Error('Empty paste data');
         
-        log('🔄 Stage 1: Decoding base64');
-        const decoded = atob(rawData);
-        log('✅ Stage 1: Base64 decoded', { length: decoded.length });
+        // Reconstruct full SDP from chunks
+        const lines = rawData.split('\n---\n');
+        let fullSdp = '';
         
-        log('🔄 Stage 2: Parsing JSON');
-        const remoteData = JSON.parse(decoded);
-        log('✅ Stage 2: JSON parsed', { hasSdp: !!remoteData.sdp });
+        log(`🔄 Processing ${lines.length} chunks`);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            const decoded = atob(line.trim());
+            const chunkData = JSON.parse(decoded);
+            fullSdp += chunkData.sdp;
+            log(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}`);
+        }
         
-        if (!remoteData.sdp) throw new Error('No SDP in data');
+        log('✅ Full SDP reconstructed', { totalLength: fullSdp.length });
         
-        // FIXED: Create PC and add tracks BEFORE setRemoteDescription
-        log('🔄 Stage 3: Creating peer connection FIRST');
-        pc = new RTCPeerConnection(config);
-        
-        // Get media BEFORE setting remote description
         const mediaReady = await setupMedia();
         if (!mediaReady) throw new Error('Camera setup failed');
         
-        log('🔄 Stage 4: Adding tracks to answerer');
-        localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
-            log(`✅ Added track: ${track.kind}`);
-        });
+        log('🔄 Creating peer connection');
+        pc = new RTCPeerConnection(config);
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
         
         pc.ontrack = e => {
             log('📹 Remote stream received');
             document.getElementById('remoteVideo').srcObject = e.streams[0];
         };
         
-        log('🔄 Stage 5: Setting remote offer (AFTER tracks)');
-        await pc.setRemoteDescription({ type: 'offer', sdp: remoteData.sdp });
-        log('✅ Stage 5: Remote offer set');
+        log('🔄 Setting remote offer (FULL SDP)');
+        await pc.setRemoteDescription({ type: 'offer', sdp: fullSdp });
+        log('✅ Remote offer set');
         
-        log('🔄 Stage 6: Creating answer');
+        log('🔄 Creating answer');
         const answer = await pc.createAnswer();
-        log('✅ Stage 6: Answer created');
-        
-        log('🔄 Stage 7: Setting local answer');
         await pc.setLocalDescription(answer);
-        log('✅ Stage 7: Local answer set');
+        log('✅ Answer ready');
         
-        // Wait for ICE
-        log('⏳ Waiting ICE for answer...');
+        // ICE gathering for answer
         await new Promise(resolve => {
-            const timeout = setTimeout(() => {
-                log('⚠️ Answer ICE timeout');
-                resolve();
-            }, 3000);
-            
             const checkIce = setInterval(() => {
                 if (pc.iceGatheringState === 'complete') {
                     clearInterval(checkIce);
-                    clearTimeout(timeout);
-                    log('✅ Answer ICE complete');
+                    updateCopyData();
                     resolve();
                 }
             }, 200);
         });
         
-        updateCopyData();
-        
     } catch (err) {
-        log(`❌ ANSWER FAILED: ${err.message}`, { pastePreview: pasteEl.value.substring(0, 100) });
+        log(`❌ ANSWER FAILED: ${err.message}`);
         statusEl.textContent = `❌ Invalid data: ${err.message}`;
     }
 }
@@ -243,10 +228,20 @@ async function useRemoteData() {
     log('🔄 Using remote ANSWER');
     try {
         const rawData = pasteEl.value.trim();
-        const decoded = atob(rawData);
-        const remoteData = JSON.parse(decoded);
+        if (!rawData) throw new Error('Empty paste data');
         
-        log('✅ Parsed answer', { sdpLength: remoteData.sdp?.length });
+        // Reconstruct full answer SDP
+        const lines = rawData.split('\n---\n');
+        let fullSdp = '';
+        
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            const decoded = atob(line.trim());
+            const chunkData = JSON.parse(decoded);
+            fullSdp += chunkData.sdp;
+        }
+        
+        log('✅ Full answer reconstructed', { totalLength: fullSdp.length });
         
         if (!pc) {
             log('❌ No peer connection - create offer first');
@@ -254,8 +249,8 @@ async function useRemoteData() {
             return;
         }
         
-        log('🔄 Setting remote answer');
-        await pc.setRemoteDescription({ type: 'answer', sdp: remoteData.sdp });
+        log('🔄 Setting remote answer (FULL SDP)');
+        await pc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
         log('✅ Remote answer set - P2P connected!');
         statusEl.textContent = '✅ Connected! Check video';
         
@@ -273,15 +268,39 @@ function updateCopyData() {
         return;
     }
     
-    const data = { sdp: pc.localDescription.sdp };
-    const compact = btoa(JSON.stringify(data));
-    
-    log('📋 Copy ready', { 
+    const sdp = pc.localDescription.sdp;
+    log('📋 Full SDP ready', { 
         type: pc.localDescription.type, 
-        encodedSize: compact.length 
+        sdpLength: sdp.length,
+        iceState: pc.iceGatheringState
     });
     
-    copyEl.value = compact;
-    copyToClipboard();
-    statusEl.textContent = `✅ ${pc.localDescription.type.toUpperCase()} ready! Copied to clipboard`;
+    // Split large SDP into safe chunks
+    const CHUNK_SIZE = 2800; // Conservative for JSON + base64
+    const chunks = [];
+    
+    for (let i = 0; i < sdp.length; i += CHUNK_SIZE) {
+        const chunk = sdp.slice(i, i + CHUNK_SIZE);
+        const data = { 
+            type: pc.localDescription.type,
+            chunk: i / CHUNK_SIZE,
+            total: Math.ceil(sdp.length / CHUNK_SIZE),
+            sdp: chunk 
+        };
+        const compact = btoa(JSON.stringify(data));
+        chunks.push(compact);
+    }
+    
+    // Copy ALL chunks with Telegram separator
+    const copyText = chunks.join('\n---\n');
+    copyEl.value = copyText;
+    
+    navigator.clipboard.writeText(copyText).then(() => {
+        log('✅ Full SDP copied', { chunks: chunks.length, totalSize: copyText.length });
+        copyFeedbackEl.textContent = `✅ Copied ${chunks.length} chunks!`;
+        copyFeedbackEl.style.display = 'block';
+        setTimeout(() => { copyFeedbackEl.style.display = 'none'; }, 3000);
+    });
+    
+    statusEl.textContent = `✅ ${pc.localDescription.type.toUpperCase()} (${chunks.length} chunks) copied!`;
 }
