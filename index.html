@@ -112,210 +112,270 @@
         </div>
         
         <div id="status">Ready to create an offer</div>
+        <div id="debugLog" style="background:var(--tg-theme-secondary-bg-color); border-radius:12px; padding:12px; margin:20px 0; font-size:14px; max-height:200px; overflow:auto; display:none;"></div>
+        <button onclick="toggleDebug()" style="font-size:14px; padding:8px;">🔍 Debug Log</button>
+
         
         <video id="localVideo" autoplay muted playsinline></video>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
-<!-- Add debug console (hidden on production) -->
-<div id="debugLog" style="background:var(--tg-theme-secondary-bg-color); border-radius:12px; padding:12px; margin:20px 0; font-size:14px; max-height:200px; overflow:auto; display:none;"></div>
-<button onclick="toggleDebug()" style="font-size:14px; padding:8px;">🔍 Debug Log</button>
 
-<script>
-let DEBUG = true;
-
-function log(message, data = null) {
-    const timestamp = new Date().toLocaleTimeString();
-    const logEl = document.getElementById('debugLog');
-    const line = `[${timestamp}] ${message}`;
-    logEl.innerHTML += line + '<br>';
-    logEl.scrollTop = logEl.scrollHeight;
-    console.log(line, data);
-    if (DEBUG) document.getElementById('debugLog').style.display = 'block';
-}
-
-function toggleDebug() {
-    const logEl = document.getElementById('debugLog');
-    logEl.style.display = logEl.style.display === 'none' ? 'block' : 'none';
-}
-
-function clearLog() {
-    document.getElementById('debugLog').innerHTML = '';
-}
-
-// Replace ALL error-prone functions with these:
-
-async function setupMedia() {
-    log('🔄 Stage 1: Requesting camera...');
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, 
-            audio: true 
-        });
-        document.getElementById('localVideo').srcObject = localStream;
-        log('✅ Stage 1: Camera OK', { tracks: localStream.getTracks().length });
-        statusEl.textContent = '✅ Camera ready';
-        return true;
-    } catch (err) {
-        log(`❌ Stage 1 FAILED: ${err.name} - ${err.message}`);
-        statusEl.textContent = `❌ Camera: ${err.name}`;
-        return false;
-    }
-}
-
-async function getLocalOffer() {
-    log('🚀 Starting OFFER creation');
-    const mediaReady = await setupMedia();
-    if (!mediaReady) return;
-    
-    try {
-        log('🔄 Stage 2: Creating RTCPeerConnection');
-        pc = new RTCPeerConnection(config);
-        log('✅ Stage 2: PeerConnection created');
+    <script>
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
         
-        log('🔄 Stage 3: Adding tracks', { trackCount: localStream.getTracks().length });
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-        log('✅ Stage 3: Tracks added');
-        
-        pc.ontrack = e => {
-            log('📹 Remote stream received');
-            document.getElementById('remoteVideo').srcObject = e.streams[0];
+        // Dynamic theme matching
+        document.documentElement.style.setProperty('--tg-theme-bg-color', Telegram.WebApp.themeParams.bg_color);
+        document.documentElement.style.setProperty('--tg-theme-text-color', Telegram.WebApp.themeParams.text_color);
+        document.documentElement.style.setProperty('--tg-theme-button-color', Telegram.WebApp.themeParams.button_color);
+        document.documentElement.style.setProperty('--tg-theme-button-text-color', Telegram.WebApp.themeParams.button_text_color);
+        document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', Telegram.WebApp.themeParams.secondary_bg_color);
+        document.documentElement.style.setProperty('--tg-theme-hint-color', Telegram.WebApp.themeParams.hint_color);
+
+        const statusEl = document.getElementById('status');
+        const copyEl = document.getElementById('copyData');
+        const pasteEl = document.getElementById('pasteData');
+        let pc, localStream;
+
+        const config = { 
+            iceServers: [{urls: 'stun:stun.l.google.com:19302'}] 
         };
-        
-        log('🔄 Stage 4: Waiting for ICE candidates...');
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                log('🧊 ICE candidate gathered', { candidate: event.candidate.candidate });
-            }
-        };
-        
-        log('🔄 Stage 5: Creating offer...');
-        const offer = await pc.createOffer();
-        log('✅ Stage 5: Offer created', { type: offer.type, sdpLength: offer.sdp?.length });
-        
-        log('🔄 Stage 6: Setting local description');
-        await pc.setLocalDescription(offer);
-        log('✅ Stage 6: Local description set');
-        
-        // Wait for ICE gathering
-        log('⏳ Waiting ICE complete...');
-        setTimeout(() => {
-            if (pc.iceGatheringState === 'complete') {
-                log('✅ ICE gathering complete');
-                updateCopyData();
-            } else {
-                log('⚠️ ICE not complete, forcing update');
-                updateCopyData();
-            }
-        }, 1000);
-        
-    } catch (err) {
-        log(`❌ OFFER FAILED at stage: ${err.message}`, err);
-        statusEl.textContent = `❌ Offer failed: ${err.message}`;
-    }
-}
 
-async function getLocalAnswer() {
-    log('🔄 Starting ANSWER creation');
-    try {
-        log('🔄 Stage 1: Parsing pasted data');
-        const rawData = pasteEl.value.trim();
-        if (!rawData) throw new Error('Empty paste data');
-        
-        const decoded = atob(rawData);
-        log('✅ Stage 1: Base64 decoded', { length: decoded.length });
-        
-        const remoteData = JSON.parse(decoded);
-        log('✅ Stage 2: JSON parsed', { 
-            hasSdp: !!remoteData.sdp, 
-            sdpLength: remoteData.sdp?.length 
+        async function copyToClipboard() {
+            const copyEl = document.getElementById('copyData');
+            const feedbackEl = document.getElementById('copyFeedback');
+            
+            if (copyEl.value) {
+                try {
+                    await navigator.clipboard.writeText(copyEl.value);
+                    
+                    // Telegram haptic feedback
+                    if (Telegram.WebApp.HapticFeedback) {
+                        Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                    }
+                    
+                    // Visual feedback
+                    feedbackEl.textContent = '✅ Copied to clipboard!';
+                    feedbackEl.style.display = 'block';
+                    setTimeout(() => { feedbackEl.style.display = 'none'; }, 2000);
+                    
+                } catch (err) {
+                    feedbackEl.textContent = '❌ Copy failed';
+                    feedbackEl.style.display = 'block';
+                }
+            }
+        }
+        // Auto-copy styling for buttons
+        document.getElementById('offerBtn').addEventListener('click', () => {
+            setTimeout(() => {
+                if (document.getElementById('copyData').value) {
+                    copyToClipboard();
+                }
+            }, 1500); // After ICE gathering
         });
-        
-        if (!remoteData.sdp) throw new Error('No SDP in data');
-        
+
+        // Auto-expand and theme updates
+        Telegram.WebApp.onEvent('themeChanged', () => {
+            document.documentElement.style.setProperty('--tg-theme-bg-color', Telegram.WebApp.themeParams.bg_color);
+            document.documentElement.style.setProperty('--tg-theme-text-color', Telegram.WebApp.themeParams.text_color);
+            // ... other theme params
+        });
+
+    let DEBUG = true;
+
+    function log(message, data = null) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEl = document.getElementById('debugLog');
+        const line = `[${timestamp}] ${message}`;
+        logEl.innerHTML += line + '<br>';
+        logEl.scrollTop = logEl.scrollHeight;
+        console.log(line, data);
+        if (DEBUG) document.getElementById('debugLog').style.display = 'block';
+    }
+
+    function toggleDebug() {
+        const logEl = document.getElementById('debugLog');
+        logEl.style.display = logEl.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function clearLog() {
+        document.getElementById('debugLog').innerHTML = '';
+    }
+
+    // Replace ALL error-prone functions with these:
+
+    async function setupMedia() {
+        log('🔄 Stage 1: Requesting camera...');
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, 
+                audio: true 
+            });
+            document.getElementById('localVideo').srcObject = localStream;
+            log('✅ Stage 1: Camera OK', { tracks: localStream.getTracks().length });
+            statusEl.textContent = '✅ Camera ready';
+            return true;
+        } catch (err) {
+            log(`❌ Stage 1 FAILED: ${err.name} - ${err.message}`);
+            statusEl.textContent = `❌ Camera: ${err.name}`;
+            return false;
+        }
+    }
+
+    async function getLocalOffer() {
+        log('🚀 Starting OFFER creation');
         const mediaReady = await setupMedia();
-        if (!mediaReady) throw new Error('Camera setup failed');
+        if (!mediaReady) return;
         
-        log('🔄 Stage 3: Creating peer connection for answer');
-        pc = new RTCPeerConnection(config);
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-        
-        log('🔄 Stage 4: Setting remote offer');
-        await pc.setRemoteDescription({
-            type: 'offer', 
-            sdp: remoteData.sdp 
-        });
-        log('✅ Stage 4: Remote offer set');
-        
-        log('🔄 Stage 5: Creating answer');
-        const answer = await pc.createAnswer();
-        log('✅ Stage 5: Answer created');
-        
-        log('🔄 Stage 6: Setting local answer');
-        await pc.setLocalDescription(answer);
-        log('✅ Stage 6: Answer set');
-        
-        // Wait ICE then copy
-        setTimeout(updateCopyData, 1000);
-        
-    } catch (err) {
-        log(`❌ ANSWER FAILED: ${err.message}`, { 
-            pasteValue: pasteEl.value.substring(0, 100) + '...',
-            error: err.stack 
-        });
-        statusEl.textContent = `❌ Invalid data: ${err.message}`;
+        try {
+            log('🔄 Stage 2: Creating RTCPeerConnection');
+            pc = new RTCPeerConnection(config);
+            log('✅ Stage 2: PeerConnection created');
+            
+            log('🔄 Stage 3: Adding tracks', { trackCount: localStream.getTracks().length });
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            log('✅ Stage 3: Tracks added');
+            
+            pc.ontrack = e => {
+                log('📹 Remote stream received');
+                document.getElementById('remoteVideo').srcObject = e.streams[0];
+            };
+            
+            log('🔄 Stage 4: Waiting for ICE candidates...');
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    log('🧊 ICE candidate gathered', { candidate: event.candidate.candidate });
+                }
+            };
+            
+            log('🔄 Stage 5: Creating offer...');
+            const offer = await pc.createOffer();
+            log('✅ Stage 5: Offer created', { type: offer.type, sdpLength: offer.sdp?.length });
+            
+            log('🔄 Stage 6: Setting local description');
+            await pc.setLocalDescription(offer);
+            log('✅ Stage 6: Local description set');
+            
+            // Wait for ICE gathering
+            log('⏳ Waiting ICE complete...');
+            setTimeout(() => {
+                if (pc.iceGatheringState === 'complete') {
+                    log('✅ ICE gathering complete');
+                    updateCopyData();
+                } else {
+                    log('⚠️ ICE not complete, forcing update');
+                    updateCopyData();
+                }
+            }, 1000);
+            
+        } catch (err) {
+            log(`❌ OFFER FAILED at stage: ${err.message}`, err);
+            statusEl.textContent = `❌ Offer failed: ${err.message}`;
+        }
     }
-}
 
-async function useRemoteData() {
-    log('🔄 Using remote ANSWER data');
-    try {
-        const rawData = pasteEl.value.trim();
-        const decoded = atob(rawData);
-        const remoteData = JSON.parse(decoded);
-        
-        log('✅ Parsed answer data', { sdpLength: remoteData.sdp?.length });
-        
-        if (!pc) {
-            log('❌ No peer connection exists');
-            statusEl.textContent = '❌ Create offer first';
+    async function getLocalAnswer() {
+        log('🔄 Starting ANSWER creation');
+        try {
+            log('🔄 Stage 1: Parsing pasted data');
+            const rawData = pasteEl.value.trim();
+            if (!rawData) throw new Error('Empty paste data');
+            
+            const decoded = atob(rawData);
+            log('✅ Stage 1: Base64 decoded', { length: decoded.length });
+            
+            const remoteData = JSON.parse(decoded);
+            log('✅ Stage 2: JSON parsed', { 
+                hasSdp: !!remoteData.sdp, 
+                sdpLength: remoteData.sdp?.length 
+            });
+            
+            if (!remoteData.sdp) throw new Error('No SDP in data');
+            
+            const mediaReady = await setupMedia();
+            if (!mediaReady) throw new Error('Camera setup failed');
+            
+            log('🔄 Stage 3: Creating peer connection for answer');
+            pc = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            
+            log('🔄 Stage 4: Setting remote offer');
+            await pc.setRemoteDescription({
+                type: 'offer', 
+                sdp: remoteData.sdp 
+            });
+            log('✅ Stage 4: Remote offer set');
+            
+            log('🔄 Stage 5: Creating answer');
+            const answer = await pc.createAnswer();
+            log('✅ Stage 5: Answer created');
+            
+            log('🔄 Stage 6: Setting local answer');
+            await pc.setLocalDescription(answer);
+            log('✅ Stage 6: Answer set');
+            
+            // Wait ICE then copy
+            setTimeout(updateCopyData, 1000);
+            
+        } catch (err) {
+            log(`❌ ANSWER FAILED: ${err.message}`, { 
+                pasteValue: pasteEl.value.substring(0, 100) + '...',
+                error: err.stack 
+            });
+            statusEl.textContent = `❌ Invalid data: ${err.message}`;
+        }
+    }
+
+    async function useRemoteData() {
+        log('🔄 Using remote ANSWER data');
+        try {
+            const rawData = pasteEl.value.trim();
+            const decoded = atob(rawData);
+            const remoteData = JSON.parse(decoded);
+            
+            log('✅ Parsed answer data', { sdpLength: remoteData.sdp?.length });
+            
+            if (!pc) {
+                log('❌ No peer connection exists');
+                statusEl.textContent = '❌ Create offer first';
+                return;
+            }
+            
+            log('🔄 Setting remote answer');
+            await pc.setRemoteDescription({
+                type: 'answer', 
+                sdp: remoteData.sdp 
+            });
+            log('✅ Remote answer set');
+            
+            statusEl.textContent = '✅ Connected! Check video';
+            
+        } catch (err) {
+            log(`❌ USE DATA FAILED: ${err.message}`, err);
+            statusEl.textContent = `❌ Use failed: ${err.message}`;
+        }
+    }
+
+    // Simplified copy data (just SDP for now)
+    function updateCopyData() {
+        if (!pc?.localDescription?.sdp) {
+            log('❌ No local description to copy');
             return;
         }
         
-        log('🔄 Setting remote answer');
-        await pc.setRemoteDescription({
-            type: 'answer', 
-            sdp: remoteData.sdp 
+        const data = { sdp: pc.localDescription.sdp };
+        const compact = btoa(JSON.stringify(data));
+        
+        log('📋 Copy data ready', { 
+            type: pc.localDescription.type, 
+            sdpLength: data.sdp.length, 
+            encodedLength: compact.length 
         });
-        log('✅ Remote answer set');
         
-        statusEl.textContent = '✅ Connected! Check video';
-        
-    } catch (err) {
-        log(`❌ USE DATA FAILED: ${err.message}`, err);
-        statusEl.textContent = `❌ Use failed: ${err.message}`;
+        document.getElementById('copyData').value = compact;
+        copyToClipboard();
     }
-}
 
-// Simplified copy data (just SDP for now)
-function updateCopyData() {
-    if (!pc?.localDescription?.sdp) {
-        log('❌ No local description to copy');
-        return;
-    }
-    
-    const data = { sdp: pc.localDescription.sdp };
-    const compact = btoa(JSON.stringify(data));
-    
-    log('📋 Copy data ready', { 
-        type: pc.localDescription.type, 
-        sdpLength: data.sdp.length, 
-        encodedLength: compact.length 
-    });
-    
-    document.getElementById('copyData').value = compact;
-    copyToClipboard();
-}
-</script>
-
+    </script>
 </body>
 </html>
