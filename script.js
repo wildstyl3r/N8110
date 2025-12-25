@@ -12,6 +12,14 @@ const answerBtn = document.getElementById('answerBtn');
 const useDataBtn = document.getElementById('useDataBtn');
 const debugBtn = document.getElementById('debugBtn');
 
+const offerActionBtn = document.getElementById('offerAction');
+const offerCopyBtn = document.getElementById('offerCopy');
+const answerActionBtn = document.getElementById('answerAction');
+const answerCopyBtn = document.getElementById('answerCopy');
+
+let offerData = null;
+let answerData = null;
+
 const offerEmoji = document.querySelector('#offerBtn .emoji');
 const answerEmoji = document.querySelector('#answerBtn .emoji');
 const useDataEmoji = document.querySelector('#useDataBtn .emoji');
@@ -40,6 +48,37 @@ function setButtonStatus(buttonId, status) {
 // Initialize Telegram Mini App
 Telegram.WebApp.ready();
 Telegram.WebApp.expand();
+
+offerActionBtn.addEventListener('click', async () => {
+    offerCopyBtn.disabled = true;
+    offerEmoji.textContent = '🔄';
+    offerCopyBtn.classList.add('processing');
+    await getLocalOffer();
+    offerCopyBtn.classList.remove('processing');
+});
+
+answerActionBtn.addEventListener('click', async () => {
+    answerCopyBtn.disabled = true;
+    answerEmoji.textContent = '🔄';
+    answerCopyBtn.classList.add('processing');
+    await getLocalAnswer();
+    answerCopyBtn.classList.remove('processing');
+});
+
+offerCopyBtn.addEventListener('click', copyOfferData);
+answerCopyBtn.addEventListener('click', copyAnswerData);
+
+
+function copyAnswerData() {
+    if (!answerData) return;
+    
+    navigator.clipboard.writeText(answerData).then(() => {
+        Telegram.WebApp.HapticFeedback?.impactOccurred('light');
+        statusEl.textContent = '✅ Answer copied! Send back';
+        answerCopyBtn.classList.add('success');
+        setTimeout(() => answerCopyBtn.classList.remove('success'), 1000);
+    });
+}
 
 // Dynamic theme sync
 function updateTheme() {
@@ -149,6 +188,7 @@ async function getLocalOffer() {
                     if (pc.iceGatheringState === 'complete') {
                         clearInterval(checkIce);
                         clearTimeout(timeout);
+                         updateCopyData('offer');
                         log('✅ ICE gathering complete');
                         resolve();
                     }
@@ -245,7 +285,7 @@ async function getLocalAnswer() {
             const checkIce = setInterval(() => {
                 if (pc.iceGatheringState === 'complete') {
                     clearInterval(checkIce);
-                    updateCopyData();
+                    updateCopyData('answer');
                     resolve();
                 }
             }, 200);
@@ -308,7 +348,7 @@ useDataBtn.addEventListener('click', async () => {
 
 useDataBtn.addEventListener('click', useRemoteData);
 
-function updateCopyData() {
+function updateCopyData(type) {
     if (!pc?.localDescription?.sdp) {
         log('❌ No local description ready');
         return;
@@ -344,6 +384,20 @@ function updateCopyData() {
     }
     
     const copyText = chunks.join('!!!');
+
+    if (type === 'offer') {
+        offerData = copyText;
+        offerCopyBtn.disabled = false;
+        offerEmoji.textContent = '✅';
+        statusEl.textContent = '✅ Offer ready! Tap 📋 to copy';
+    } else {
+        answerData = copyText;
+        answerCopyBtn.disabled = false;
+        answerEmoji.textContent = '✅';
+        statusEl.textContent = '✅ Answer ready! Tap 📋 to copy';
+    }
+
+        log('✅ Data stored', { type, chunks: chunks.length });
     
     navigator.clipboard.writeText(copyText).then(() => {
         log('✅ Auto-copied', { chunks: chunks.length });

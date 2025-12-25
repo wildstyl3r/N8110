@@ -10,11 +10,16 @@
     <div class="container">
         <h1>🔗 Mobila</h1>
         
-        <div class="button-group">
-            <button id="offerBtn">1. Create Offer <span class="emoji">🌐</span></button>
-            <button id="answerBtn">2. Create Answer <span class="emoji">🌐</span></button>
+        <div class="split-button-group">
+            <div class="split-btn">
+                <button id="offerAction" class="action-btn">Create Offer</button>
+                <button id="offerCopy" class="copy-btn" disabled><span class="emoji">🌐</span></button>
+            </div>
+            <div class="split-btn">
+                <button id="answerAction" class="action-btn">Create Answer</button>
+                <button id="answerCopy" class="copy-btn" disabled><span class="emoji">🌐</span></button>
+            </div>
         </div>
-        
         <div class="input-group">
             <input id="pasteData" placeholder="Paste peer's offer/answer here..." />
             <button id="useDataBtn">3. Use Data <span class="emoji">🌐</span></button>

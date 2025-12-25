@@ -155,3 +155,54 @@ button.processing .emoji {
 button.success .emoji {
     color: #4CAF50;
 }
+.split-button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.split-btn {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.action-btn {
+    flex: 1;
+    padding: 14px 20px !important;
+    font-size: 16px !important;
+}
+
+.copy-btn {
+    width: 56px;
+    padding: 14px 12px !important;
+    border-radius: 0 12px 12px 0 !important;
+    background: var(--tg-theme-button-color, #0088cc) !important;
+    border: none !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.copy-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.copy-btn:not(:disabled):hover {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+.copy-btn.success .emoji {
+    color: #4CAF50 !important;
+}
+
+.copy-btn.processing .emoji {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
