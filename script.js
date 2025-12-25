@@ -164,7 +164,7 @@ async function getLocalOffer() {
 offerBtn.addEventListener('click', getLocalOffer);
 
 function decodeChunks(rawData, expectedType) {
-    const lines = rawData.split('\n---\n');
+    const lines = rawData.split('!!!');
     let fullSdp = '';
     
     log(`🔄 Decoding ${lines.length} chunks for ${expectedType}`);
@@ -320,7 +320,7 @@ function updateCopyData() {
         log(`${data.chunk + 1}th chunk lenght = ${base64.length}`)
     }
     
-    const copyText = chunks.join('\n---\n');
+    const copyText = chunks.join('!!!');
     copyEl.value = copyText;
     
     navigator.clipboard.writeText(copyText).then(() => {
