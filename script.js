@@ -7,21 +7,19 @@ let DEBUG = true;
 const statusEl = document.getElementById('status');
 const pasteEl = document.getElementById('pasteData');
 const debugLogEl = document.getElementById('debugLog');
-const offerBtn = document.getElementById('offerBtn');
-const answerBtn = document.getElementById('answerBtn');
+const offerBtn = document.getElementById('offerAction');
+const answerBtn = document.getElementById('answerAction');
 const useDataBtn = document.getElementById('useDataBtn');
 const debugBtn = document.getElementById('debugBtn');
 
-const offerActionBtn = document.getElementById('offerAction');
 const offerCopyBtn = document.getElementById('offerCopy');
-const answerActionBtn = document.getElementById('answerAction');
 const answerCopyBtn = document.getElementById('answerCopy');
 
 let offerData = null;
 let answerData = null;
 
-const offerEmoji = document.querySelector('#offerBtn .emoji');
-const answerEmoji = document.querySelector('#answerBtn .emoji');
+const offerEmoji = document.querySelector('#offerCopy .emoji');
+const answerEmoji = document.querySelector('#answerCopy .emoji');
 const useDataEmoji = document.querySelector('#useDataBtn .emoji');
 
 function setButtonStatus(buttonId, status) {
@@ -37,8 +35,8 @@ function setButtonStatus(buttonId, status) {
                        status === 'success' ? '✅' : '🌐';
     
     const button = document.getElementById(
-        buttonId === 'offer' ? 'offerBtn' :
-        buttonId === 'answer' ? 'answerBtn' : 'useDataBtn'
+        buttonId === 'offer' ? 'offerCopy' :
+        buttonId === 'answer' ? 'answerCopy' : 'useDataBtn'
     );
     
     button.className = status === 'processing' ? 'processing' : 
@@ -68,6 +66,16 @@ answerActionBtn.addEventListener('click', async () => {
 offerCopyBtn.addEventListener('click', copyOfferData);
 answerCopyBtn.addEventListener('click', copyAnswerData);
 
+function copyOfferData() {
+    if (!offerData) return;
+    
+    navigator.clipboard.writeText(offerData).then(() => {
+        Telegram.WebApp.HapticFeedback?.impactOccurred('light');
+        statusEl.textContent = '✅ Offer copied! Send to peer';
+        offerCopyBtn.classList.add('success');
+        setTimeout(() => offerCopyBtn.classList.remove('success'), 1000);
+    });
+}
 
 function copyAnswerData() {
     if (!answerData) return;
