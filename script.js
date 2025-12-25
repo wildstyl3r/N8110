@@ -298,7 +298,7 @@ function updateCopyData() {
     });
     
     // FIXED: URL-safe base64 encoding (no +/= corruption)
-    const CHUNK_SIZE = 2600;
+    const CHUNK_SIZE = 2000;
     const chunks = [];
     
     for (let i = 0; i < sdp.length; i += CHUNK_SIZE) {
@@ -316,6 +316,7 @@ function updateCopyData() {
         base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         
         chunks.push(base64);
+        log(`${i}th chunk lenght = ${base64.length}`)
     }
     
     const copyText = chunks.join('\n---\n');
