@@ -190,11 +190,12 @@
                 statusEl.textContent = 'Requesting camera permission...';
                 
                 localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        width: { ideal: 640 }, 
-                        height: { ideal: 480 }, 
-                        facingMode: 'user' 
-                    }, 
+                    video: true,
+                    // { 
+                    //     width: { ideal: 640 }, 
+                    //     height: { ideal: 480 }, 
+                    //     facingMode: 'user' 
+                    // }, 
                     audio: true 
                 });
                 
