@@ -163,38 +163,55 @@ async function getLocalOffer() {
 
 offerBtn.addEventListener('click', getLocalOffer);
 
+function decodeChunks(rawData, expectedType) {
+    const lines = rawData.split('\n---\n');
+    let fullSdp = '';
+    
+    log(`🔄 Decoding ${lines.length} chunks for ${expectedType}`);
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        try {
+            // URL-safe base64 → standard base64
+            let base64 = line;
+            base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+            const padding = base64.length % 4;
+            if (padding) base64 += '='.repeat(4 - padding);
+            
+            const decoded = atob(base64);
+            const chunkData = JSON.parse(decoded);
+            
+            // Validate
+            if (chunkData.type !== expectedType) {
+                throw new Error(`Expected ${expectedType}, got ${chunkData.type} in chunk ${i+1}`);
+            }
+            if ('total' in chunkData && chunkData.chunk >= chunkData.total) {
+                throw new Error(`Invalid chunk index ${chunkData.chunk}`);
+            }
+            
+            fullSdp += chunkData.sdp;
+            log(`✅ Chunk ${chunkData.chunk + 1}: ${chunkData.sdp.length} chars`);
+            
+        } catch (chunkErr) {
+            log(`❌ Chunk ${i+1} RAW:`, line.substring(0, 50) + '...');
+            throw new Error(`Chunk ${i+1} failed: ${chunkErr.message}`);
+        }
+    }
+    
+    log(`✅ Full SDP: ${fullSdp.length} chars`);
+    return fullSdp;
+}
+
 async function getLocalAnswer() {
     log('🔄 Starting ANSWER creation');
     try {
         const rawData = pasteEl.value.trim();
         if (!rawData) throw new Error('Empty paste data');
         
-        // Reconstruct full SDP from chunks
-        const lines = rawData.split('\n---\n');
-        log(`🔄 Processing ${lines.length} chunks for offer`);
-        let fullSdp = '';
-        let expectedType = 'offer';
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            
-            try {
-                const decoded = atob(line);
-                const chunkData = JSON.parse(decoded);
-                
-                if (chunkData.type !== expectedType) {
-                    throw new Error(`Expected ${expectedType}, got ${chunkData.type} in chunk ${i+1}`);
-                }
-                
-                fullSdp += chunkData.sdp;
-                log(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}`);
-            } catch (chunkErr) {
-                throw new Error(`Chunk ${i+1} failed: ${chunkErr.message}`);
-            }
-        }
-        
-        log('✅ Full SDP reconstructed', { totalLength: fullSdp.length });
+        // Decode offer chunks
+        const fullSdp = decodeChunks(rawData, 'offer');
         
         const mediaReady = await setupMedia();
         if (!mediaReady) throw new Error('Camera setup failed');
@@ -208,7 +225,7 @@ async function getLocalAnswer() {
             document.getElementById('remoteVideo').srcObject = e.streams[0];
         };
         
-        log('🔄 Setting remote offer (FULL SDP)');
+        log('🔄 Setting remote offer');
         await pc.setRemoteDescription({ type: 'offer', sdp: fullSdp });
         log('✅ Remote offer set');
         
@@ -217,7 +234,7 @@ async function getLocalAnswer() {
         await pc.setLocalDescription(answer);
         log('✅ Answer ready');
         
-        // ICE gathering for answer
+        // ICE gathering
         await new Promise(resolve => {
             const checkIce = setInterval(() => {
                 if (pc.iceGatheringState === 'complete') {
@@ -234,6 +251,7 @@ async function getLocalAnswer() {
     }
 }
 
+
 answerBtn.addEventListener('click', getLocalAnswer);
 
 async function useRemoteData() {
@@ -242,38 +260,8 @@ async function useRemoteData() {
         const rawData = pasteEl.value.trim();
         if (!rawData) throw new Error('Empty paste data');
         
-        // Reconstruct full answer SDP from chunks
-        const lines = rawData.split('\n---\n');
-        let fullSdp = '';
-        let expectedType = 'answer';
-        
-        log(`🔄 Processing ${lines.length} chunks for ${expectedType}`);
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            
-            try {
-                const decoded = atob(line);
-                const chunkData = JSON.parse(decoded);
-                
-                // Validate chunk
-                if (chunkData.type !== expectedType) {
-                    throw new Error(`Expected ${expectedType}, got ${chunkData.type} in chunk ${i+1}`);
-                }
-                if (chunkData.chunk !== i) {
-                    log(`⚠️ Chunk out of order: expected ${i}, got ${chunkData.chunk}`);
-                }
-                
-                fullSdp += chunkData.sdp;
-                log(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}: ${chunkData.sdp.length} chars`);
-                
-            } catch (chunkErr) {
-                throw new Error(`Chunk ${i+1} failed: ${chunkErr.message}`);
-            }
-        }
-        
-        log('✅ Full answer reconstructed', { totalLength: fullSdp.length });
+        // Decode answer chunks
+        const fullSdp = decodeChunks(rawData, 'answer');
         
         if (!pc) {
             log('❌ No peer connection - create offer first');
@@ -281,21 +269,17 @@ async function useRemoteData() {
             return;
         }
         
-        log('🔄 Setting remote answer (FULL SDP)');
-        await pc.setRemoteDescription({ 
-            type: 'answer', 
-            sdp: fullSdp 
-        });
+        log('🔄 Setting remote answer');
+        await pc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
         log('✅ Remote answer set - P2P connected!');
         statusEl.textContent = '✅ Connected! Check video';
         
     } catch (err) {
         log(`❌ USE DATA FAILED: ${err.message}`);
         statusEl.textContent = `❌ Use failed: ${err.message}`;
-        copyFeedbackEl.textContent = `❌ ${err.message}`;
-        copyFeedbackEl.style.display = 'block';
     }
 }
+
 
 
 useDataBtn.addEventListener('click', useRemoteData);
@@ -313,32 +297,36 @@ function updateCopyData() {
         iceState: pc.iceGatheringState
     });
     
-    // Split large SDP into safe chunks
-    const CHUNK_SIZE = 2800; // Conservative for JSON + base64
+    // FIXED: URL-safe base64 encoding (no +/= corruption)
+    const CHUNK_SIZE = 2600;
     const chunks = [];
     
     for (let i = 0; i < sdp.length; i += CHUNK_SIZE) {
         const chunk = sdp.slice(i, i + CHUNK_SIZE);
         const data = { 
             type: pc.localDescription.type,
-            chunk: i / CHUNK_SIZE,
+            chunk: Math.floor(i / CHUNK_SIZE),
             total: Math.ceil(sdp.length / CHUNK_SIZE),
             sdp: chunk 
         };
-        const compact = btoa(JSON.stringify(data));
-        chunks.push(compact);
+        
+        // URL-safe base64: replace +/ with -_, remove =
+        let jsonStr = JSON.stringify(data);
+        let base64 = btoa(jsonStr);
+        base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        
+        chunks.push(base64);
     }
     
-    // Copy ALL chunks with Telegram separator
     const copyText = chunks.join('\n---\n');
     copyEl.value = copyText;
     
     navigator.clipboard.writeText(copyText).then(() => {
-        log('✅ Full SDP copied', { chunks: chunks.length, totalSize: copyText.length });
-        copyFeedbackEl.textContent = `✅ Copied ${chunks.length} chunks!`;
+        log('✅ URL-safe SDP copied', { chunks: chunks.length });
+        copyFeedbackEl.textContent = `✅ Copied ${chunks.length} chunks! (URL-safe)`;
         copyFeedbackEl.style.display = 'block';
-        setTimeout(() => { copyFeedbackEl.style.display = 'none'; }, 3000);
+        setTimeout(() => copyFeedbackEl.style.display = 'none', 3000);
     });
     
-    statusEl.textContent = `✅ ${pc.localDescription.type.toUpperCase()} (${chunks.length} chunks) copied!`;
+    statusEl.textContent = `✅ ${pc.localDescription.type.toUpperCase()} (${chunks.length} chunks)`;
 }
