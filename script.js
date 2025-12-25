@@ -171,15 +171,27 @@ async function getLocalAnswer() {
         
         // Reconstruct full SDP from chunks
         const lines = rawData.split('\n---\n');
+        log(`🔄 Processing ${lines.length} chunks for offer`);
         let fullSdp = '';
-        
-        log(`🔄 Processing ${lines.length} chunks`);
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            const decoded = atob(line.trim());
-            const chunkData = JSON.parse(decoded);
-            fullSdp += chunkData.sdp;
-            log(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}`);
+        let expectedType = 'offer';
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            try {
+                const decoded = atob(line);
+                const chunkData = JSON.parse(decoded);
+                
+                if (chunkData.type !== expectedType) {
+                    throw new Error(`Expected ${expectedType}, got ${chunkData.type} in chunk ${i+1}`);
+                }
+                
+                fullSdp += chunkData.sdp;
+                log(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}`);
+            } catch (chunkErr) {
+                throw new Error(`Chunk ${i+1} failed: ${chunkErr.message}`);
+            }
         }
         
         log('✅ Full SDP reconstructed', { totalLength: fullSdp.length });
@@ -230,15 +242,35 @@ async function useRemoteData() {
         const rawData = pasteEl.value.trim();
         if (!rawData) throw new Error('Empty paste data');
         
-        // Reconstruct full answer SDP
+        // Reconstruct full answer SDP from chunks
         const lines = rawData.split('\n---\n');
         let fullSdp = '';
+        let expectedType = 'answer';
         
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            const decoded = atob(line.trim());
-            const chunkData = JSON.parse(decoded);
-            fullSdp += chunkData.sdp;
+        log(`🔄 Processing ${lines.length} chunks for ${expectedType}`);
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            try {
+                const decoded = atob(line);
+                const chunkData = JSON.parse(decoded);
+                
+                // Validate chunk
+                if (chunkData.type !== expectedType) {
+                    throw new Error(`Expected ${expectedType}, got ${chunkData.type} in chunk ${i+1}`);
+                }
+                if (chunkData.chunk !== i) {
+                    log(`⚠️ Chunk out of order: expected ${i}, got ${chunkData.chunk}`);
+                }
+                
+                fullSdp += chunkData.sdp;
+                log(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}: ${chunkData.sdp.length} chars`);
+                
+            } catch (chunkErr) {
+                throw new Error(`Chunk ${i+1} failed: ${chunkErr.message}`);
+            }
         }
         
         log('✅ Full answer reconstructed', { totalLength: fullSdp.length });
@@ -250,15 +282,21 @@ async function useRemoteData() {
         }
         
         log('🔄 Setting remote answer (FULL SDP)');
-        await pc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
+        await pc.setRemoteDescription({ 
+            type: 'answer', 
+            sdp: fullSdp 
+        });
         log('✅ Remote answer set - P2P connected!');
         statusEl.textContent = '✅ Connected! Check video';
         
     } catch (err) {
         log(`❌ USE DATA FAILED: ${err.message}`);
         statusEl.textContent = `❌ Use failed: ${err.message}`;
+        copyFeedbackEl.textContent = `❌ ${err.message}`;
+        copyFeedbackEl.style.display = 'block';
     }
 }
+
 
 useDataBtn.addEventListener('click', useRemoteData);
 
