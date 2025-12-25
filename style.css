@@ -177,7 +177,7 @@ button.success .emoji {
 .copy-btn {
     width: 56px;
     padding: 14px 12px !important;
-    border-radius: 0 12px 12px 0 !important;
+    border-radius: 12px 12px 12px 12px !important;
     background: var(--tg-theme-button-color, #0088cc) !important;
     border: none !important;
     cursor: pointer;

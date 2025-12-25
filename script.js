@@ -188,15 +188,20 @@ async function getLocalOffer() {
         // FIXED: Wait for FULL ICE gathering (3 seconds max)
         log('⏳ Waiting for complete ICE gathering...');
         await new Promise(resolve => {
-            const checkIce = setInterval(() => {
-                if (pc.iceGatheringState === 'complete') {
-                    clearInterval(checkIce);
-                    clearTimeout(timeout);
-                        updateCopyData('offer');
-                    log('✅ ICE gathering complete');
+            const timeout = setTimeout(() => {
+                    log('⚠️ ICE timeout - using partial candidates');
                     resolve();
-                }
-            }, 200);
+                }, 3000);
+                
+                const checkIce = setInterval(() => {
+                    if (pc.iceGatheringState === 'complete') {
+                        clearInterval(checkIce);
+                        clearTimeout(timeout);
+                         updateCopyData('offer');
+                        log('✅ ICE gathering complete');
+                        resolve();
+                    }
+                }, 200);
         });
         
         updateCopyData();
