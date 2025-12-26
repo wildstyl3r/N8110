@@ -144,8 +144,8 @@ const business = {
             ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${rawParts[1].length}→${minimalSdp.length})`);
             return minimalSdp;
         }catch (err) {
-            ui.logUI(`❌ Decode failed: ${err.message}`);
-            throw new Error(`Invalid compressed SDP: ${err.message}`);
+            ui.logUI(`❌ Decode failed: ${err.message} from ${err}`);
+            throw new Error(`Invalid compressed SDP: ${err.message} from ${err}`);
         }
     },
 
