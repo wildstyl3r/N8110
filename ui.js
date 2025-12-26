@@ -41,7 +41,7 @@ function setButtonStatus(buttonType, status) {
     button.className = status === 'processing' ? 'processing' : 
                       status === 'success' ? 'success' : '';
     
-    if (status === 'ready') {
+    if (status === 'success') {
         button.disabled = false;
     }
 }
@@ -131,8 +131,8 @@ elements.debugBtn.addEventListener('click', () => {
 // Public UI API for business logic
 window.ui = {
     setButtonStatus,
-    storeOfferData: (data) => { offerData = data; setButtonStatus('offer', 'ready'); },
-    storeAnswerData: (data) => { answerData = data; setButtonStatus('answer', 'ready'); },
+    storeOfferData: (data) => { offerData = data; setButtonStatus('offer', 'success'); },
+    storeAnswerData: (data) => { answerData = data; setButtonStatus('answer', 'success'); },
     updateStatus,
     logUI,
     getPasteData: () => elements.pasteData.value.trim(),
