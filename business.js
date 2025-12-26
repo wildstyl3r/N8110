@@ -139,7 +139,7 @@ const business = {
             if (padding) base64 += '='.repeat(padding);
             
             const compressed = atob(base64);
-            const minimalSdp = pako.inflate(compressed, { to: 'string' });
+            const minimalSdp = pako.inflateRaw(compressed, { to: 'string' });
             
             ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${rawParts[1].length}→${minimalSdp.length})`);
             return minimalSdp;
