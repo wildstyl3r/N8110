@@ -136,8 +136,33 @@ window.ui = {
     updateStatus,
     logUI,
     getPasteData: () => elements.pasteData.value.trim(),
-    setLocalVideo: (stream) => { elements.localVideo.srcObject = stream; },
-    setRemoteVideo: (stream) => { elements.remoteVideo.srcObject = stream; },
+    setLocalVideo: (stream) => {
+        const video = elements.localVideo;
+        video.srcObject = stream;
+        
+        // ANDROID WEBVIEW FIXES
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.style.objectFit = 'cover';
+        video.style.width = '100%';
+        video.style.height = '200px';
+        
+        // Force play on Android
+        video.play().catch(e => ui.logUI('Local video play:', e));
+    },
+    setRemoteVideo: (stream) => {
+        const video = elements.remoteVideo;
+        video.srcObject = stream;
+        
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.style.objectFit = 'cover';
+        video.style.width = '100%';
+        video.style.height = '200px';
+        
+        // Android remote video force-start
+        setTimeout(() => video.play().catch(e => ui.logUI('Remote video play:', e)), 500);
+    },
     resetUI: () => {
         offerData = null; answerData = null;
         elements.offerCopyBtn.disabled = true;

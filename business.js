@@ -37,8 +37,21 @@ const business = {
         ui.logUI('🔄 Requesting camera');
         try {
             localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-                audio: true 
+                video: { 
+                    width: { ideal: 640, max: 1280 }, 
+                    height: { ideal: 480, max: 720 },
+                    frameRate: { ideal: 15, max: 30 }, // Lower FPS for Android
+                    facingMode: 'user'
+                }, 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                },
+            });
+            localStream.getVideoTracks()[0].applyConstraints({
+                width: { ideal: 640 },
+                height: { ideal: 480 }
             });
             ui.setLocalVideo(localStream);
             ui.logUI('✅ Stage 1: Camera OK', { tracks: localStream.getTracks().length });
@@ -133,9 +146,18 @@ const business = {
             });
             
             pc.ontrack = e => {
-                ui.logUI('📹 Remote stream received');
-                ui.setRemoteVideo(e.streams[0])
+                ui.logUI(`📹 Remote track: ${event.track.kind}`);
+                ui.setRemoteVideo(event.streams[0]);
+                
+                // ANDROID FIX: Restart remote video track
+                event.streams[0].getVideoTracks()[0]?.addEventListener('ended', () => {
+                    ui.logUI('Remote track ended - restarting');
+                });
             };
+            if (pc.addTransceiver) {
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+            }
 
             pc.onconnectionstatechange = () => {
                 ui.logUI(`Connection state: ${pc.connectionState}`);

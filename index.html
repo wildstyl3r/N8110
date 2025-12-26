@@ -2,7 +2,7 @@
 <html>
 <head>
     <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="stylesheet" href="style.css">
     <title>Mobila</title>
 </head>
@@ -27,8 +27,19 @@
         
         <div id="status" class="status">Ready to create an offer</div>
         
-        <video id="localVideo" autoplay muted playsinline></video>
-        <video id="remoteVideo" autoplay playsinline></video>
+        <video id="localVideo" 
+            autoplay 
+            muted 
+            playsinline 
+            webkit-playsinline
+            style="width:100%; max-height:200px; object-fit:cover; background:#333;">
+        </video>
+        <video id="remoteVideo" 
+            autoplay 
+            playsinline 
+            webkit-playsinline
+            style="width:100%; max-height:200px; object-fit:cover; background:#333;">
+        </video>
         
         <button id="debugBtn" class="debug-btn">🔍 Debug Log</button>
         <div id="debugLog" class="debug-log"></div>
@@ -41,6 +52,13 @@
         // Telegram init (UI only)
         Telegram.WebApp.ready();
         Telegram.WebApp.expand();
+        if (navigator.userAgent.includes('TelegramAndroid')) {
+            document.addEventListener('DOMContentLoaded', () => {
+                Telegram.WebApp.expand();
+                // Force hardware acceleration
+                document.body.style.transform = 'translateZ(0)';
+            });
+        }
         
         // Theme sync
         function updateTheme() {
