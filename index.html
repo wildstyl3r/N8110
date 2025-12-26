@@ -32,8 +32,30 @@
         
         <button id="debugBtn" class="debug-btn">🔍 Debug Log</button>
         <div id="debugLog" class="debug-log"></div>
+        <button onclick="resetConnection()" class="debug-btn">🔄 Reset All</button>
     </div>
 
-    <script src="script.js"></script>
+    <script src="ui.js"></script>
+    <script src="business.js"></script>
+    <script>
+        // Telegram init (UI only)
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+        
+        // Theme sync
+        function updateTheme() {
+            ['bg_color', 'text_color', 'button_color', 'button_text_color', 'secondary_bg_color', 'hint_color']
+                .forEach(param => {
+                    if (Telegram.WebApp.themeParams[param]) {
+                        document.documentElement.style.setProperty(
+                            `--tg-theme-${param.replace('_', '-')}`, 
+                            Telegram.WebApp.themeParams[param]
+                        );
+                    }
+                });
+        }
+        updateTheme();
+        Telegram.WebApp.onEvent('themeChanged', updateTheme);
+    </script>
 </body>
 </html>
