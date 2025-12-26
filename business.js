@@ -86,8 +86,7 @@ const business = {
         // 1. STRIP unnecessary lines (30% smaller)
         const minimalSdp = sdp
             .split('\n')
-            .filter(line => !line.startsWith('a=ice-ufrag:') && 
-                        !line.startsWith('a=ice-pwd:') && 
+            .filter(line => 
                         !line.match(/candidate.*relay/)) // Skip TURN
             .join('\n');
         ui.logUI(`ℹ️ Minimal SDP is ${minimalSdp.length} chars`);
