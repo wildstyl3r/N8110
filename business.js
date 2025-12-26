@@ -90,6 +90,7 @@ const business = {
                         !line.startsWith('a=ice-pwd:') && 
                         !line.match(/candidate.*relay/)) // Skip TURN
             .join('\n');
+        ui.logUI(`ℹ️ Minimal SDP is ${minimalSdp.length} chars`);
         
         // 2. DEFLATE compress (50-70% smaller)
         const compressed = pako.deflate(minimalSdp, { to: 'string' });
@@ -100,7 +101,9 @@ const business = {
         
         // 4. Add metadata
         // const data = { {"answer":"@&!",}[type], compressed: true, sdp: base64 };
-        return {"answer":"(a)","offer": "(o)"}[type]+base64;
+        let result = {"answer":"(a)","offer": "(o)"}[type]+base64;
+        ui.logUI(`✅ Compressed to ${result.length} chars`);
+        return result;
 
         const CHUNK_SIZE = 2600;
         const chunks = [];
