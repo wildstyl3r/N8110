@@ -81,6 +81,27 @@ const business = {
 
     // Chunk encoding
     encodeChunks(sdp, type) {
+        ui.logUI(`🔄 Compressing ${sdp.length} chars SDP`);
+    
+        // 1. STRIP unnecessary lines (30% smaller)
+        const minimalSdp = sdp
+            .split('\n')
+            .filter(line => !line.startsWith('a=ice-ufrag:') && 
+                        !line.startsWith('a=ice-pwd:') && 
+                        !line.match(/candidate.*relay/)) // Skip TURN
+            .join('\n');
+        
+        // 2. DEFLATE compress (50-70% smaller)
+        const compressed = pako.deflate(minimalSdp, { to: 'string' });
+        
+        // 3. URL-safe base64
+        let base64 = btoa(compressed);
+        base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        
+        // 4. Add metadata
+        const data = { type, compressed: true, sdp: base64 };
+        return btoa(JSON.stringify(data));
+
         const CHUNK_SIZE = 2600;
         const chunks = [];
         
@@ -98,38 +119,28 @@ const business = {
 
     // Chunk decoding  
     decodeChunks(rawData, expectedType) {
-        const lines = rawData.split('!!!');
-        let fullSdp = '';
-        
-        ui.logUI(`🔄 Decoding ${lines.length} chunks (${expectedType})`);
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
+        try {
+            const decoded = atob(rawData.trim());
+            const data = JSON.parse(decoded);
             
-            try {
-                let base64 = line.replace(/-/g, '+').replace(/_/g, '/');
-                const padding = (4 - (base64.length % 4)) % 4;
-                base64 += '='.repeat(padding);
-                
-                const decoded = atob(base64);
-                const chunkData = JSON.parse(decoded);
-                
-                if (chunkData.type !== expectedType) {
-                    throw new Error(`Expected ${expectedType}, got ${chunkData.type}`);
-                }
-                
-                fullSdp += chunkData.sdp;
-                ui.logUI(`✅ Chunk ${chunkData.chunk + 1}/${chunkData.total}`);
-                
-            } catch (chunkErr) {
-                ui.logUI(`❌ Chunk ${i+1}: ${chunkErr.message}`);
-                throw new Error(`Chunk ${i+1}: ${chunkErr.message}`);
+            if (data.type !== expectedType) {
+                throw new Error(`Expected ${expectedType}, got ${data.type}`);
             }
+            
+            // DEFLATE decompress
+            let base64 = data.sdp.replace(/-/g, '+').replace(/_/g, '/');
+            const padding = base64.length % 4;
+            if (padding) base64 += '='.repeat(4 - padding);
+            
+            const compressed = atob(base64);
+            const minimalSdp = pako.inflate(compressed, { to: 'string' });
+            
+            ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${data.sdp.length}→${minimalSdp.length})`);
+            return minimalSdp;
+        }catch (err) {
+            ui.logUI(`❌ Decode failed: ${err.message}`);
+            throw new Error(`Invalid compressed SDP: ${err.message}`);
         }
-        
-        ui.logUI(`✅ Full SDP: ${fullSdp.length} chars`);
-        return fullSdp;
     },
 
     async getLocalOffer() {
