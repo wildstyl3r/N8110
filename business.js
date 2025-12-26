@@ -97,7 +97,7 @@ const business = {
         
         // 3. URL-safe base64
         let base64 = btoa(compressed);
-        base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');$
+        base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         
         // 4. Add metadata
         // const data = { {"answer":"@&!",}[type], compressed: true, sdp: base64 };
