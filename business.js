@@ -96,11 +96,11 @@ const business = {
         
         // 3. URL-safe base64
         let base64 = btoa(compressed);
-        base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');$
         
         // 4. Add metadata
-        const data = { type, compressed: true, sdp: base64 };
-        return btoa(JSON.stringify(data));
+        // const data = { {"answer":"@&!",}[type], compressed: true, sdp: base64 };
+        return {"answer":"(a)","offer": "(o)"}[type]+base64;
 
         const CHUNK_SIZE = 2600;
         const chunks = [];
@@ -120,22 +120,25 @@ const business = {
     // Chunk decoding  
     decodeChunks(rawData, expectedType) {
         try {
-            const decoded = atob(rawData.trim());
-            const data = JSON.parse(decoded);
+            let rawParts = rawData.trim().split(")");
+            if (rawParts[0].length != 2) {
+                throw new Error(`Expected type mark, got ${rawParts[0]}`);
+            }
+            let dataType = {"(a":"answer", "(o":"offer"}[rawParts[0]];
             
-            if (data.type !== expectedType) {
-                throw new Error(`Expected ${expectedType}, got ${data.type}`);
+            if (dataType !== expectedType) {
+                throw new Error(`Expected ${expectedType}, got ${dataType}`);
             }
             
             // DEFLATE decompress
-            let base64 = data.sdp.replace(/-/g, '+').replace(/_/g, '/');
-            const padding = base64.length % 4;
-            if (padding) base64 += '='.repeat(4 - padding);
+            let base64 = rawParts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padding = (4 - base64.length % 4) % 4;
+            if (padding) base64 += '='.repeat(padding);
             
             const compressed = atob(base64);
             const minimalSdp = pako.inflate(compressed, { to: 'string' });
             
-            ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${data.sdp.length}→${minimalSdp.length})`);
+            ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${rawParts[1].length}→${minimalSdp.length})`);
             return minimalSdp;
         }catch (err) {
             ui.logUI(`❌ Decode failed: ${err.message}`);
