@@ -93,10 +93,10 @@ const business = {
         ui.logUI(`ℹ️ Minimal SDP is ${minimalSdp.length} chars`);
         
         // 2. DEFLATE compress (50-70% smaller)
-        const compressed = pako.deflate(minimalSdp, { to: 'string' });
+        const compressed = pako.deflate(minimalSdp);
         
         // 3. URL-safe base64
-        let base64 = btoa(compressed);
+        let base64 = btoa(String.fromCharCode(...compressed));
         base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         
         // 4. Add metadata
@@ -138,8 +138,8 @@ const business = {
             const padding = (4 - base64.length % 4) % 4;
             if (padding) base64 += '='.repeat(padding);
             
-            const compressed = atob(base64);
-            const minimalSdp = pako.inflateRaw(compressed, { to: 'string' });
+            const compressed = Uint8Array.from(atob(base64),c=>c.charCodeAt(0));
+            const minimalSdp = pako.inflate(compressed, { to: 'string' });
             
             ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${rawParts[1].length}→${minimalSdp.length})`);
             return minimalSdp;
