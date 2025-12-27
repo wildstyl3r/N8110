@@ -10,10 +10,6 @@ const elements = {
     dataOfferEmoji: document.querySelector('#dataOfferCopy .emoji'),
     dataAnswerEmoji: document.querySelector('#dataAnswerCopy .emoji'),
 
-    // offerActionBtn: document.getElementById('offerAction'),
-    // offerCopyBtn: document.getElementById('offerCopy'),
-    // answerActionBtn: document.getElementById('answerAction'),
-    // answerCopyBtn: document.getElementById('answerCopy'),
     useDataBtn: document.getElementById('useDataBtn'),
     pasteData: document.getElementById('pasteData'),
     statusEl: document.getElementById('status'),
@@ -21,8 +17,6 @@ const elements = {
     remoteVideo: document.getElementById('remoteVideo'),
     debugBtn: document.getElementById('debugBtn'),
     debugLogEl: document.getElementById('debugLog'),
-    offerEmoji: document.querySelector('#offerCopy .emoji'),
-    answerEmoji: document.querySelector('#answerCopy .emoji'),
     useDataEmoji: document.querySelector('#useDataBtn .emoji')
 };
 
@@ -33,8 +27,8 @@ let answerData = null;
 // UI State Management
 function setButtonStatus(buttonType, status) {
     const emoji = {
-        'offer': elements.offerEmoji,
-        'answer': elements.answerEmoji,
+        'offer': elements.dataOfferEmoji,
+        'answer': elements.dataAnswerEmoji,
         'use': elements.useDataEmoji
     }[buttonType];
     
@@ -189,8 +183,8 @@ window.ui = {
         offerData = null; answerData = null;
         elements.dataOfferCopyBtn.disabled = true;
         elements.dataAnswerCopyBtn.disabled = true;
-        elements.offerEmoji.textContent = '🌐';
-        elements.answerEmoji.textContent = '🌐';
+        elements.dataOfferEmoji.textContent = '🌐';
+        elements.dataAnswerEmoji.textContent = '🌐';
         elements.localVideo.srcObject = null;
         elements.remoteVideo.srcObject = null;
         elements.videoControls.style.display = 'none';
