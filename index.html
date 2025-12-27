@@ -65,10 +65,13 @@
     <script>
         // Telegram init (UI only)
         Telegram.WebApp.ready();
-        Telegram.WebApp.expand();
+        Telegram.WebApp.hideKeyboard();
+        Telegram.WebApp.enableVerticalSwipes();
+        Telegram.WebApp.enableClosingConfirmation();
+        // Telegram.WebApp.expand();
         if (navigator.userAgent.includes('TelegramAndroid')) {
             document.addEventListener('DOMContentLoaded', () => {
-                Telegram.WebApp.expand();
+                // Telegram.WebApp.expand();
                 // Force hardware acceleration
                 document.body.style.transform = 'translateZ(0)';
             });
