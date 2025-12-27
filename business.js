@@ -293,6 +293,7 @@ const business = {
 
             dataPc.oniceconnectionstatechange = () => {
                 if (dataPc.iceConnectionState === 'connected') {
+                    ui.logUI('seems connected, trying to create datachannel');
                     dataChannel = dataPc.createDataChannel('signaling', { 
                         ordered: true, 
                         maxRetransmits: 0 
