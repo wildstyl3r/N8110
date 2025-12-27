@@ -153,7 +153,7 @@ const business = {
             });
             await dataPc.setLocalDescription(offer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
-            ui.storeDataOffer(business.getSDPEncoded(dataPc, 'offer'));
+            ui.storeOfferData(business.getSDPEncoded(dataPc, 'offer'));
         } catch (err) {
             ui.logUI(`❌ DATA OFFER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
@@ -187,7 +187,7 @@ const business = {
             const answer = await dataPc.createAnswer();
             await dataPc.setLocalDescription(answer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
-            ui.storeDataAnswer(business.getSDPEncoded(dataPc, 'answer'));
+            ui.storeAnswerData(business.getSDPEncoded(dataPc, 'answer'));
         } catch (err) {
             ui.logUI(`❌ DATA ANSWER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
