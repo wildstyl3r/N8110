@@ -5,7 +5,9 @@ body {
     margin: 0; padding: 20px; 
     background: var(--tg-theme-bg-color, #ffffff);
     color: var(--tg-theme-text-color, #000000);
-    min-height: 100vh;
+    /* min-height: 100vh; */
+    heigth: 200px;
+    overflow: scroll;
     text-align: center;
     line-height: 1.4;
 }
