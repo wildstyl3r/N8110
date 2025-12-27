@@ -131,7 +131,24 @@ const business = {
             dataPc.onconnectionstatechange = () => ui.logUI(`Connection state: ${dataPc.connectionState}`);
             dataPc.onicecandidate = (event) => { if (event.candidate) { ui.logUI('🧊 ICE candidate gathered'); } };
             dataPc.onicegatheringstatechange = () => ui.logUI(`ICE state: ${dataPc.iceGatheringState}`);
-            dataPc.oniceconnectionstatechange = () => ui.logUI(`Data ICE: ${dataPc.iceConnectionState}`);
+            dataPc.oniceconnectionstatechange = () => {
+                if (dataPc.iceConnectionState === 'connected') {
+                    ui.logUI('seems connected, trying to create datachannel');
+                    dataChannel = dataPc.createDataChannel('signaling', { 
+                        ordered: true, 
+                        maxRetransmits: 0 
+                    });
+                    
+                    dataChannel.onopen = () => {
+                        ui.logUI('✅ Data channel ready');
+                        ui.updateStatus('✅ Data link established! Ready for video.');
+                        ui.showVideoControls();
+                    };
+                    dataChannel.onmessage = business.handleDataChannelMessage;
+                } else {
+                    ui.logUI(`dataPc ICE state becomes ${dataPc.iceConnectionState}`);
+                }
+            };
             
             // Minimal SDP - NO MEDIA
             const offer = await dataPc.createOffer({
@@ -290,23 +307,6 @@ const business = {
                 ui.updateStatus(`❌ Wrong state: ${dataPc.signalingState}, expected 'have-local-offer'`);
                 return;
             }
-
-            dataPc.oniceconnectionstatechange = () => {
-                if (dataPc.iceConnectionState === 'connected') {
-                    ui.logUI('seems connected, trying to create datachannel');
-                    dataChannel = dataPc.createDataChannel('signaling', { 
-                        ordered: true, 
-                        maxRetransmits: 0 
-                    });
-                    
-                    dataChannel.onopen = () => {
-                        ui.logUI('✅ Data channel ready');
-                        ui.updateStatus('✅ Data link established! Ready for video.');
-                        ui.showVideoControls();
-                    };
-                    dataChannel.onmessage = business.handleDataChannelMessage;
-                }
-            };
             
             await dataPc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
             ui.logUI(`✅ Connected! State: ${dataPc.signalingState}`);
