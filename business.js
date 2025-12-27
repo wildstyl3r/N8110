@@ -290,24 +290,28 @@ const business = {
                 ui.updateStatus(`❌ Wrong state: ${dataPc.signalingState}, expected 'have-local-offer'`);
                 return;
             }
+
+            dataPc.oniceconnectionstatechange = () => {
+                if (dataPc.iceConnectionState === 'connected') {
+                    dataChannel = dataPc.createDataChannel('signaling', { 
+                        ordered: true, 
+                        maxRetransmits: 0 
+                    });
+                    
+                    dataChannel.onopen = () => {
+                        ui.logUI('✅ Data channel ready');
+                        ui.updateStatus('✅ Data link established! Ready for video.');
+                        ui.showVideoControls();
+                    };
+                    dataChannel.onmessage = business.handleDataChannelMessage;
+                }
+            };
             
             await dataPc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
             ui.logUI(`✅ Connected! State: ${dataPc.signalingState}`);
             ui.updateStatus('✅ P2P Connected!');
-
-
             // Create signaling data channel
-            dataChannel = dataPc.createDataChannel('signaling', { 
-                ordered: true, 
-                maxRetransmits: 0 
-            });
             
-            dataChannel.onopen = () => {
-                ui.logUI('✅ Data channel ready');
-                ui.updateStatus('✅ Data link established! Ready for video.');
-                ui.showVideoControls();
-            };
-            dataChannel.onmessage = business.handleDataChannelMessage;
             return;
         } catch (err) {
             ui.logUI(`❌ USE ERROR: ${err.message}`);
