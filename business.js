@@ -261,8 +261,13 @@ const business = {
     },
 
     async createVideoOffer() {
-        if (!dataChannel || dataChannel.readyState !== 'open') {
+        if (!dataChannel) {
             ui.updateStatus('❌ Data link required first');
+            return;
+        }
+
+        if (dataChannel.readyState !== 'open') {
+            ui.updateStatus(`❌ Data channel state is${dataChannel.readyState}`);
             return;
         }
         
