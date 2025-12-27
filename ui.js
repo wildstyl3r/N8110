@@ -1,8 +1,19 @@
+/*global Telegram, business, ui */
+
 const elements = {
-    offerActionBtn: document.getElementById('offerAction'),
-    offerCopyBtn: document.getElementById('offerCopy'),
-    answerActionBtn: document.getElementById('answerAction'),
-    answerCopyBtn: document.getElementById('answerCopy'),
+    dataOfferActionBtn: document.getElementById('dataOfferAction'),
+    dataOfferCopyBtn: document.getElementById('dataOfferCopy'),
+    dataAnswerActionBtn: document.getElementById('dataAnswerAction'),
+    dataAnswerCopyBtn: document.getElementById('dataAnswerCopy'),
+    videoOfferActionBtn: document.getElementById('videoOfferAction'),
+    videoControls: document.getElementById('videoControls'),
+    dataOfferEmoji: document.querySelector('#dataOfferCopy .emoji'),
+    dataAnswerEmoji: document.querySelector('#dataAnswerCopy .emoji'),
+
+    // offerActionBtn: document.getElementById('offerAction'),
+    // offerCopyBtn: document.getElementById('offerCopy'),
+    // answerActionBtn: document.getElementById('answerAction'),
+    // answerCopyBtn: document.getElementById('answerCopy'),
     useDataBtn: document.getElementById('useDataBtn'),
     pasteData: document.getElementById('pasteData'),
     statusEl: document.getElementById('status'),
@@ -33,8 +44,8 @@ function setButtonStatus(buttonType, status) {
                        status === 'success' ? '✅' : '🌐';
     
     const button = {
-        'offer': elements.offerCopyBtn,
-        'answer': elements.answerCopyBtn,
+        'offer': elements.dataOfferCopyBtn,
+        'answer': elements.dataAnswerCopyBtn,
         'use': elements.useDataBtn
     }[buttonType];
     
@@ -52,8 +63,8 @@ function copyOfferData() {
     navigator.clipboard.writeText(offerData).then(() => {
         Telegram.WebApp.HapticFeedback?.impactOccurred('light');
         elements.statusEl.textContent = '✅ Offer copied! Send to peer';
-        elements.offerCopyBtn.classList.add('success');
-        setTimeout(() => elements.offerCopyBtn.classList.remove('success'), 1000);
+        elements.dataOfferCopyBtn.classList.add('success');
+        setTimeout(() => elements.dataOfferCopyBtn.classList.remove('success'), 1000);
     });
 }
 
@@ -62,8 +73,8 @@ function copyAnswerData() {
     navigator.clipboard.writeText(answerData).then(() => {
         Telegram.WebApp.HapticFeedback?.impactOccurred('light');
         elements.statusEl.textContent = '✅ Answer copied! Send back';
-        elements.answerCopyBtn.classList.add('success');
-        setTimeout(() => elements.answerCopyBtn.classList.remove('success'), 1000);
+        elements.dataAnswerCopyBtn.classList.add('success');
+        setTimeout(() => elements.dataAnswerCopyBtn.classList.remove('success'), 1000);
     });
 }
 
@@ -81,33 +92,6 @@ function logUI(message, data = null) {
 }
 
 // Event Listeners
-elements.offerActionBtn.addEventListener('click', async () => {
-    elements.offerActionBtn.disabled = true; // Prevent double-click
-    setButtonStatus('offer', 'processing');
-    try {
-        await business.getLocalOffer();
-    } catch (err) {
-        ui.logUI(`❌ Offer action failed: ${err.message}`);
-        setButtonStatus('offer', ''); // Reset on error
-    } finally {
-        elements.offerActionBtn.disabled = false;
-    }
-});
-
-elements.answerActionBtn.addEventListener('click', async () => {
-    elements.answerActionBtn.disabled = true;
-    setButtonStatus('answer', 'processing');
-    
-    try {
-        await business.getLocalAnswer();
-    } catch (err) {
-        ui.logUI(`❌ Answer action failed: ${err.message}`);
-        setButtonStatus('answer', ''); 
-    } finally {
-        elements.answerActionBtn.disabled = false;
-    }
-});
-
 elements.useDataBtn.addEventListener('click', async () => {
     elements.useDataBtn.disabled = true;
     setButtonStatus('use', 'processing');
@@ -122,17 +106,55 @@ elements.useDataBtn.addEventListener('click', async () => {
     }
 });
 
-elements.offerCopyBtn.addEventListener('click', copyOfferData);
-elements.answerCopyBtn.addEventListener('click', copyAnswerData);
+elements.dataOfferActionBtn.addEventListener('click', async () => {
+    elements.dataOfferActionBtn.disabled = true;
+    setButtonStatus('offer', 'processing');
+    try {
+        await business.createDataOffer();
+    } catch (err) {
+        ui.logUI(`❌ Data offer failed: ${err.message}`);
+    } finally {
+        elements.dataOfferActionBtn.disabled = false;
+    }
+});
+
+elements.dataAnswerActionBtn.addEventListener('click', async () => {
+    elements.dataAnswerActionBtn.disabled = true;
+    setButtonStatus('answer', 'processing');
+    try {
+        await business.createDataAnswer();
+    } catch (err) {
+        ui.logUI(`❌ Data answer failed: ${err.message}`);
+    } finally {
+        elements.dataAnswerActionBtn.disabled = false;
+    }
+});
+
+// Copy handlers
+elements.dataOfferCopyBtn.addEventListener('click', copyOfferData);
+elements.dataAnswerCopyBtn.addEventListener('click', copyAnswerData);
 elements.debugBtn.addEventListener('click', () => {
     elements.debugLogEl.style.display = elements.debugLogEl.style.display === 'none' ? 'block' : 'none';
+});
+elements.videoOfferActionBtn.addEventListener('click', async () => {
+    elements.videoOfferActionBtn.disabled = true;
+    elements.videoOfferActionBtn.textContent = '🔄 Starting...';
+    try {
+        await business.createVideoOffer();
+    } catch (err) {
+        ui.logUI(`❌ Video offer failed: ${err.message}`);
+    } finally {
+        elements.videoOfferActionBtn.disabled = false;
+        elements.videoOfferActionBtn.textContent = '📹 Start Video Call';
+    }
 });
 
 // Public UI API for business logic
 window.ui = {
     setButtonStatus,
     storeOfferData: (data) => { offerData = data; setButtonStatus('offer', 'success'); },
-    storeAnswerData: (data) => { answerData = data; setButtonStatus('answer', 'success'); },
+    storeAnswerData: (data) => { answerData = data; setButtonStatus('answer', 'success'); elements.videoControls.style.display = 'block'; },
+    showVideoControls: () => elements.videoControls.style.display = 'block',
     updateStatus,
     logUI,
     getPasteData: () => elements.pasteData.value.trim(),
@@ -165,12 +187,13 @@ window.ui = {
     },
     resetUI: () => {
         offerData = null; answerData = null;
-        elements.offerCopyBtn.disabled = true;
-        elements.answerCopyBtn.disabled = true;
+        elements.dataOfferCopyBtn.disabled = true;
+        elements.dataAnswerCopyBtn.disabled = true;
         elements.offerEmoji.textContent = '🌐';
         elements.answerEmoji.textContent = '🌐';
         elements.localVideo.srcObject = null;
         elements.remoteVideo.srcObject = null;
+        elements.videoControls.style.display = 'none';
         updateStatus('🧹 Reset complete');
     }
 };

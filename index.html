@@ -9,9 +9,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔗 Mobila</h1>
+        <h1>📟 Mobila</h1>
         
-        <div class="split-button-group">
+        <!-- <div class="split-button-group">
             <div class="split-btn">
                 <button id="offerAction" class="action-btn">Create Offer</button>
                 <button id="offerCopy" class="copy-btn" disabled><span class="emoji">🌐</span></button>
@@ -20,10 +20,23 @@
                 <button id="answerAction" class="action-btn">Create Answer</button>
                 <button id="answerCopy" class="copy-btn" disabled><span class="emoji">🌐</span></button>
             </div>
+        </div> -->
+        <div class="split-button-group">
+            <div class="split-btn">
+                <button id="dataOfferAction" class="action-btn">1. Create Data Link</button>
+                <button id="dataOfferCopy" class="copy-btn" disabled><span class="emoji">🌐</span></button>
+            </div>
+            <div class="split-btn">
+                <button id="dataAnswerAction" class="action-btn">Accept Data Link</button>
+                <button id="dataAnswerCopy" class="copy-btn" disabled><span class="emoji">🌐</span></button>
+            </div>
         </div>
         <div class="input-group">
             <input id="pasteData" placeholder="Paste peer's offer/answer here..." />
             <button id="useDataBtn">3. Use Data <span class="emoji">🌐</span></button>
+        </div>
+        <div class="split-button-group" id="videoControls" style="display:none;">
+            <button id="videoOfferAction" class="action-btn">📹 Start Video Call</button>
         </div>
         
         <div id="status" class="status">Ready to create an offer</div>

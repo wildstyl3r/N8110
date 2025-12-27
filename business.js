@@ -1,6 +1,9 @@
+/*global ui, pako */
 // Global state
-let pc = null;
+let dataPc = null;
+let mediaPc = null;
 let localStream = null;
+let dataChannel = null;
 const config = { 
     iceServers: [
         {urls: 'stun:stun.l.google.com:19302'},
@@ -11,19 +14,15 @@ const config = {
 // Business Logic API
 const business = {
     // Reset everything
-    resetConnection() {
+    resetAll() {
         ui.logUI('🧹 Full reset');
-        
-        if (pc) {
-            pc.close();
-            pc = null;
-        }
-        
+        if (dataPc) { dataPc.close(); dataPc = null; }
+        if (mediaPc) { mediaPc.close(); mediaPc = null; }
         if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
             localStream = null;
         }
-        
+        if (dataChannel) dataChannel = null;
         ui.resetUI();
     },
 
@@ -64,17 +63,17 @@ const business = {
     },
 
 
-    getCopyData(type){
-        if (!pc?.localDescription?.sdp) {
+    getSDPEncoded(connection, type){
+        if (!connection?.localDescription?.sdp) {
             ui.logUI('❌ No local description ready');
-            return;
+            throw new Error('❌ No local description ready');
         }
         
-        const sdp = pc.localDescription.sdp;
+        const sdp = connection.localDescription.sdp;
         ui.logUI('📋 Full SDP ready', { 
-            type: pc.localDescription.type, 
+            type: connection.localDescription.type, 
             sdpLength: sdp.length,
-            iceState: pc.iceGatheringState
+            iceState: connection.iceGatheringState
         });
         return business.encodeChunks(sdp,type);
     },
@@ -82,8 +81,7 @@ const business = {
     // Chunk encoding
     encodeChunks(sdp, type) {
         ui.logUI(`🔄 Compressing ${sdp.length} chars SDP`);
-    
-        // 1. STRIP unnecessary lines (30% smaller)
+
         const minimalSdp = sdp
             .split('\n')
             .filter(line => 
@@ -91,32 +89,12 @@ const business = {
             .join('\n');
         ui.logUI(`ℹ️ Minimal SDP is ${minimalSdp.length} chars`);
         
-        // 2. DEFLATE compress (50-70% smaller)
-        const compressed = pako.deflate(minimalSdp);
-        
-        // 3. URL-safe base64
-        let base64 = btoa(String.fromCharCode(...compressed));
+        let base64 = btoa(String.fromCharCode(...pako.deflate(minimalSdp)));
         base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         
-        // 4. Add metadata
-        // const data = { {"answer":"@&!",}[type], compressed: true, sdp: base64 };
         let result = {"answer":"(a)","offer": "(o)"}[type]+base64;
         ui.logUI(`✅ Compressed to ${result.length} chars`);
         return result;
-
-        const CHUNK_SIZE = 2600;
-        const chunks = [];
-        
-        for (let i = 0; i < sdp.length; i += CHUNK_SIZE) {
-            const chunk = sdp.slice(i, i + CHUNK_SIZE);
-            const data = { type, chunk: Math.floor(i / CHUNK_SIZE), total: Math.ceil(sdp.length / CHUNK_SIZE), sdp: chunk };
-            let jsonStr = JSON.stringify(data);
-            let base64 = btoa(jsonStr);
-            base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-            chunks.push(base64);
-        }
-        
-        return chunks.join('!!!');
     },
 
     // Chunk decoding  
@@ -127,18 +105,13 @@ const business = {
                 throw new Error(`Expected type mark, got ${rawParts[0]}`);
             }
             let dataType = {"(a":"answer", "(o":"offer"}[rawParts[0]];
-            
             if (dataType !== expectedType) {
                 throw new Error(`Expected ${expectedType}, got ${dataType}`);
             }
             
-            // DEFLATE decompress
             let base64 = rawParts[1].replace(/-/g, '+').replace(/_/g, '/');
-            const padding = (4 - base64.length % 4) % 4;
-            if (padding) base64 += '='.repeat(padding);
-            
-            const compressed = Uint8Array.from(atob(base64),c=>c.charCodeAt(0));
-            const minimalSdp = pako.inflate(compressed, { to: 'string' });
+            base64 += '='.repeat((4 - base64.length % 4) % 4);
+            const minimalSdp = pako.inflate(Uint8Array.from(atob(base64), c => c.charCodeAt(0)), { to: 'string' });
             
             ui.logUI(`✅ Decompressed ${minimalSdp.length} chars (${rawParts[1].length}→${minimalSdp.length})`);
             return minimalSdp;
@@ -148,106 +121,300 @@ const business = {
         }
     },
 
-    async getLocalOffer() {
-        business.resetConnection();
+    async createDataOffer() {
+        business.resetAll();
         
-        const mediaReady = await business.setupMedia();
-        if (!mediaReady) return;
-        
-        try {
-            pc = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(track => {
-                pc.addTrack(track, localStream);
-                ui.logUI(`✅ Added track: ${track.kind}`);
+        try{
+            dataPc = new RTCPeerConnection(config);
+            
+            // Create signaling data channel
+            dataChannel = dataPc.createDataChannel('signaling', { 
+                ordered: true, 
+                maxRetransmits: 0 
             });
             
-            pc.ontrack = e => {
-                ui.logUI(`📹 Remote track: ${event.track.kind}`);
-                ui.setRemoteVideo(event.streams[0]);
-                
-                // ANDROID FIX: Restart remote video track
-                event.streams[0].getVideoTracks()[0]?.addEventListener('ended', () => {
-                    ui.logUI('Remote track ended - restarting');
-                });
+            dataChannel.onopen = () => {
+                ui.logUI('✅ Data channel ready');
+                ui.updateStatus('✅ Data link established! Ready for video.');
+                ui.showVideoControls();
             };
-            if (pc.addTransceiver) {
-                pc.addTransceiver('video', { direction: 'recvonly' });
-                pc.addTransceiver('audio', { direction: 'recvonly' });
+
+            dataPc.onconnectionstatechange = () => ui.logUI(`Connection state: ${dataPc.connectionState}`);
+            dataPc.onicecandidate = (event) => { if (event.candidate) { ui.logUI('🧊 ICE candidate gathered'); } };
+            dataPc.onicegatheringstatechange = () => ui.logUI(`ICE state: ${dataPc.iceGatheringState}`);
+            
+            // Minimal SDP - NO MEDIA
+            const offer = await dataPc.createOffer({
+                offerToReceiveAudio: 0,
+                offerToReceiveVideo: 0
+            });
+            await dataPc.setLocalDescription(offer);
+            ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
+            ui.storeDataOffer(business.getSDPEncoded(dataPc, 'offer'));
+        } catch (err) {
+            ui.logUI(`❌ DATA OFFER ERROR: ${err.message}`);
+            ui.updateStatus(`❌ ${err.message}`);
+            throw err;
+        }
+    },
+
+    async createDataAnswer() {
+        business.resetAll();
+        
+        const rawData = ui.getPasteData();
+        if (!rawData) throw new Error('Paste data offer first');
+        
+        try {
+            const offerSdp = business.decodeChunks(rawData, 'offer');
+            
+            dataPc = new RTCPeerConnection(config);
+            
+            // Receive data channel
+            dataPc.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                dataChannel.onopen = () => {
+                    ui.logUI('✅ Data channel open');
+                    ui.updateStatus('✅ Data link ready! Video controls unlocked.');
+                    ui.showVideoControls();
+                };
+                dataChannel.onmessage = business.handleDataChannelMessage;
+            };
+
+            await dataPc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+            const answer = await dataPc.createAnswer();
+            await dataPc.setLocalDescription(answer);
+            ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
+            ui.storeDataAnswer(business.getSDPEncoded(dataPc, 'answer'));
+        } catch (err) {
+            ui.logUI(`❌ DATA ANSWER ERROR: ${err.message}`);
+            ui.updateStatus(`❌ ${err.message}`);
+            throw err;
+        }
+    },
+
+    handleDataChannelMessage(event) {
+        try {
+            const msg = JSON.parse(event.data);
+            ui.logUI(`📨 Data channel: ${msg.type}`);
+            
+            if (msg.type === 'video-offer') {
+                business.handleVideoOffer(msg.sdp);
+            } else if (msg.type === 'video-answer') {
+                business.handleVideoAnswer(msg.sdp);
             }
-
-            pc.onconnectionstatechange = () => {
-                ui.logUI(`Connection state: ${pc.connectionState}`);
-            };
-            
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    ui.logUI('🧊 ICE candidate gathered');
-                }
-            };
-            
-            pc.onicegatheringstatechange = () => {
-                ui.logUI(`ICE state: ${pc.iceGatheringState}`);
-            };
-            
-            const offer = await pc.createOffer();//{ offerToReceiveAudio: true, offerToReceiveVideo: true }
-            await pc.setLocalDescription(offer);
-            ui.logUI(`✅ Offer ready. State: ${pc.signalingState}`);
-            
-            // Wait ICE
-            setTimeout(() => {
-                const data = business.getCopyData('offer');
-                ui.storeOfferData(data);
-            }, 2500);
-            return;
         } catch (err) {
-            ui.logUI(`❌ OFFER ERROR: ${err.message}`);
-            ui.updateStatus(`❌ ${err.message}`);
-            throw err;
+            ui.logUI(`❌ Data message error: ${err.message}`);
         }
     },
 
-    async getLocalAnswer() {
-        business.resetConnection();
+    async initMediaChannel(initType, sdpData) {
+        const mediaStream = await business.setupMedia();
+        if (!mediaStream) {
+            ui.updateStatus('Failed to init media channel');
+            return false;
+        }
         
-        try {
-            const rawData = ui.getPasteData();
-            if (!rawData) throw new Error('Paste offer first');
-            
-            const fullSdp = business.decodeChunks(rawData, 'offer');
-            
-            const mediaReady = await business.setupMedia();
-            if (!mediaReady) throw new Error('Camera needed');
-            
-            pc = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(track => {
-                pc.addTrack(track, localStream);
-                ui.logUI(`✅ Added track: ${track.kind}`);
-            });
-            
-            pc.ontrack = e => {
-                ui.logUI('📹 Remote stream received');
-                ui.setRemoteVideo(e.streams[0])
-            };
+        mediaPc = new RTCPeerConnection(config);
+        mediaStream.getTracks().forEach(track => mediaPc.addTrack(track, mediaStream));
+        
+        mediaPc.ontrack = (e) => {
+            ui.logUI(`📹 Video track received`);
+            ui.setRemoteVideo(e.streams[0]);
+        };
+        
+        if (initType === 'answer') {
+            await mediaPc.setRemoteDescription({ type: 'offer', sdp: business.decodeChunks(sdpData, 'offer') });
+        }
+        
+        const description = await (initType === "offer" ? mediaPc.createOffer() : mediaPc.createAnswer());
+        await mediaPc.setLocalDescription(description);
+        
+        // Send answer BACK via data channel
+        dataChannel.send(JSON.stringify({
+            type: 'video-'+initType,
+            sdp: business.encodeChunks(mediaPc.localDescription.sdp, initType)
+        }));
+        return true;
+    },
 
-            pc.onconnectionstatechange = () => {
-                ui.logUI(`Connection state: ${pc.connectionState}`);
-            };
-            
-            await pc.setRemoteDescription({ type: 'offer', sdp: fullSdp });
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            
-            setTimeout(() => {
-                const data = business.getCopyData('answer');
-                ui.storeAnswerData(data);
-            }, 2500);
-            return;
+    async handleVideoOffer(sdpData) {
+        ui.logUI('🔄 Processing video offer');
+        {
+        // Setup media for answerer
+        // const mediaStream = await business.setupMedia();
+        // if (!mediaStream) return;
+        
+        // mediaPc = new RTCPeerConnection(config);
+        // mediaStream.getTracks().forEach(track => mediaPc.addTrack(track, mediaStream));
+        
+        // mediaPc.ontrack = (e) => {
+        //     ui.logUI(`📹 Video track received`);
+        //     ui.setRemoteVideo(e.streams[0]);
+        // };
+        
+        // const offerSdp = business.decodeChunks(sdpData, 'offer');
+        // await mediaPc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+        
+        // const answer = await mediaPc.createAnswer();
+        // await mediaPc.setLocalDescription(answer);
+        
+        // // Send answer BACK via data channel
+        // dataChannel.send(JSON.stringify({
+        //     type: 'video-answer',
+        //     sdp: business.encodeChunks(mediaPc.localDescription.sdp, 'answer')
+        // }));
+}
+        try{
+            if (business.initMediaChannel('answer', sdpData)) {
+                ui.updateStatus('✅ Video connected!');
+            }
         } catch (err) {
-            ui.logUI(`❌ ANSWER ERROR: ${err.message}`);
+            ui.logUI(`❌ VIDEO ANSWER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
             throw err;
         }
     },
+
+    async handleVideoAnswer(sdpData) {
+        const answerSdp = business.decodeChunks(sdpData, 'answer');
+        await mediaPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        ui.logUI('✅ Video answer applied');
+        ui.updateStatus('✅ Video call live!');
+    },
+
+    async createVideoOffer() {
+        if (!dataChannel || dataChannel.readyState !== 'open') {
+            ui.updateStatus('❌ Data link required first');
+            return;
+        }
+        
+        if (mediaPc) {
+            ui.logUI('❌ Media PC already exists');
+            return;
+        }
+        
+        ui.logUI('🎥 Creating video offer');
+        {// const mediaStream = await business.setupMedia();
+        // if (!mediaStream) return;
+        
+        // mediaPc = new RTCPeerConnection(config);
+        // mediaStream.getTracks().forEach(track => mediaPc.addTrack(track, mediaStream));
+        
+        // mediaPc.ontrack = (e) => {
+        //     ui.setRemoteVideo(e.streams[0]);
+        // };
+        
+        // const offer = await mediaPc.createOffer();
+        // await mediaPc.setLocalDescription(offer);
+
+        // dataChannel.send(JSON.stringify({
+        //     type: 'video-offer',
+        //     sdp: business.encodeChunks(mediaPc.localDescription.sdp, 'offer')
+        // }));
+        }
+        try {
+            if (business.initMediaChannel('offer')) {
+                ui.updateStatus('📤 Video offer sent via data channel...');
+            }
+        } catch (err) {
+            ui.logUI(`❌ VIDEO OFFER ERROR: ${err.message}`);
+            ui.updateStatus(`❌ ${err.message}`);
+            throw err;
+        }
+    },
+
+
+    // async getLocalOffer() {
+    //     business.resetAll();
+        
+    //     const mediaReady = await business.setupMedia();
+    //     if (!mediaReady) return;
+        
+    //     try {
+    //         pc = new RTCPeerConnection(config);
+    //         localStream.getTracks().forEach(track => {
+    //             pc.addTrack(track, localStream);
+    //             ui.logUI(`✅ Added track: ${track.kind}`);
+    //         });
+            
+    //         pc.ontrack = e => {
+    //             ui.logUI(`📹 Remote track: ${e.track.kind}`);
+    //             ui.setRemoteVideo(e.streams[0]);
+                
+    //             // ANDROID FIX: Restart remote video track
+    //             e.streams[0].getVideoTracks()[0]?.addEventListener('ended', () => {
+    //                 ui.logUI('Remote track ended - restarting');
+    //             });
+    //         };
+    //         if (pc.addTransceiver) {
+    //             pc.addTransceiver('video', { direction: 'recvonly' });
+    //             pc.addTransceiver('audio', { direction: 'recvonly' });
+    //         }
+
+    //         pc.onconnectionstatechange = () => {
+    //             ui.logUI(`Connection state: ${pc.connectionState}`);
+    //         };
+            
+    //         pc.onicecandidate = (event) => {
+    //             if (event.candidate) {
+    //                 ui.logUI('🧊 ICE candidate gathered');
+    //             }
+    //         };
+            
+    //         pc.onicegatheringstatechange = () => {
+    //             ui.logUI(`ICE state: ${pc.iceGatheringState}`);
+    //         };
+            
+    //         const offer = await pc.createOffer();//{ offerToReceiveAudio: true, offerToReceiveVideo: true }
+    //         await pc.setLocalDescription(offer);
+    //         ui.logUI(`✅ Offer ready. State: ${pc.signalingState}`);
+    //         ui.storeOfferData(business.getSDPEncoded(pc,'offer'));
+    //         return;
+    //     } catch (err) {
+    //         ui.logUI(`❌ OFFER ERROR: ${err.message}`);
+    //         ui.updateStatus(`❌ ${err.message}`);
+    //         throw err;
+    //     }
+    // },
+
+    // async getLocalAnswer() {
+    //     business.resetAll();
+        
+    //     try {
+    //         const rawData = ui.getPasteData();
+    //         if (!rawData) throw new Error('Paste offer first');
+            
+    //         const fullSdp = business.decodeChunks(rawData, 'offer');
+            
+    //         const mediaReady = await business.setupMedia();
+    //         if (!mediaReady) throw new Error('Camera needed');
+            
+    //         pc = new RTCPeerConnection(config);
+    //         localStream.getTracks().forEach(track => {
+    //             pc.addTrack(track, localStream);
+    //             ui.logUI(`✅ Added track: ${track.kind}`);
+    //         });
+            
+    //         pc.ontrack = e => {
+    //             ui.logUI('📹 Remote stream received');
+    //             ui.setRemoteVideo(e.streams[0])
+    //         };
+
+    //         pc.onconnectionstatechange = () => {
+    //             ui.logUI(`Connection state: ${pc.connectionState}`);
+    //         };
+            
+    //         await pc.setRemoteDescription({ type: 'offer', sdp: fullSdp });
+    //         const answer = await pc.createAnswer();
+    //         await pc.setLocalDescription(answer);
+    //         ui.storeAnswerData(business.getSDPEncoded(pc,'answer'));
+    //         return;
+    //     } catch (err) {
+    //         ui.logUI(`❌ ANSWER ERROR: ${err.message}`);
+    //         ui.updateStatus(`❌ ${err.message}`);
+    //         throw err;
+    //     }
+    // },
 
     async useRemoteData() {
         try {
@@ -256,17 +423,17 @@ const business = {
             
             const fullSdp = business.decodeChunks(rawData, 'answer');
             
-            if (!pc)  {
+            if (!dataPc)  {
                 ui.updateStatus(`❌ Create fresh offer first`);
                 return;
             }
-            if(pc.signalingState !== 'have-local-offer'){
-                ui.updateStatus(`❌ Wrong state: ${pc.signalingState}, expected 'have-local-offer'`);
+            if(dataPc.signalingState !== 'have-local-offer'){
+                ui.updateStatus(`❌ Wrong state: ${dataPc.signalingState}, expected 'have-local-offer'`);
                 return;
             }
             
-            await pc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
-            ui.logUI(`✅ Connected! State: ${pc.signalingState}`);
+            await dataPc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
+            ui.logUI(`✅ Connected! State: ${dataPc.signalingState}`);
             ui.updateStatus('✅ P2P Connected!');
             return;
         } catch (err) {
