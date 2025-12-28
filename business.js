@@ -369,7 +369,8 @@ window.business = {
 async testCircuitRelays() {
   console.log('Testing libp2p bootstraping...');
   if (node) await node.stop();
-  node = await createLibp2p({
+  try {
+    node = await createLibp2p({
     start:false,
     addresses: {
       listen: ['/p2p-circuit', '/ip4/127.0.0.1/tcp/8000/ws']
@@ -404,13 +405,17 @@ async testCircuitRelays() {
         identify: identify()
     }
   });
+} catch (err) {
+    console.log(`error at creation: ${err}`)
+}
+  
   node.addEventListener('peer:discovery', (evt) => {
     console.log('found peer: ', evt.detail.toString())
     });
 console.log('libp2p prepared');
 try {
 
-await node.start();
+    await node.start();
 } catch (err) {
     console.log(`error at startup: ${err}`)
 }
