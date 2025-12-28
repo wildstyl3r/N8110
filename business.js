@@ -87,7 +87,7 @@ async function testCircuitRelays(relayMultiaddrs=relayList, timeout = 10000) {
       });
       
       // Connect to relay and test circuit reservation
-      const relayPeerId = /* extract peer ID from multiaddr */;
+    //   const relayPeerId = /* extract peer ID from multiaddr */;
       await node.dial(relayMultiaddr);
       
       // Wait for connection
