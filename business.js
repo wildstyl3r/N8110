@@ -143,7 +143,6 @@ const business = {
         
         try{
             dataPc = new RTCPeerConnection(config);
-            dataPc.onnegotiationneeded = null;
 
             dataPc.onconnectionstatechange = () => ui.logUI(`Connection state: ${dataPc.connectionState}`);
             dataPc.onicecandidate = (event) => {
