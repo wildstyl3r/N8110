@@ -1,9 +1,10 @@
+/* global  Libp2PCircuitRelayV2*/
 // Global state
 
 import { ui } from './ui.js';
 import pako from 'pako';
 import { createLibp2p } from 'libp2p';
-import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
+const { circuitRelayTransport } = Libp2PCircuitRelayV2;
 import { noise } from 'libp2p-noise';
 import { yamux } from 'libp2p-yamux';
 let dataPc = null;
