@@ -1,16 +1,16 @@
-/* global  Libp2PCircuitRelayV2*/
 // Global state
 
 import { ui } from './ui.js';
-import pako from 'pako';
 import { createLibp2p } from 'libp2p';
-const { circuitRelayTransport } = Libp2PCircuitRelayV2;
+const { circuitRelayTransport } = window.Libp2PCircuitRelayV2;
 import { noise } from 'libp2p-noise';
 import { yamux } from 'libp2p-yamux';
 let dataPc = null;
 let mediaPc = null;
 let localStream = null;
 let dataChannel = null;
+
+const pako = window.pako;
 
 const stunDomains = [
   'stun.l.google.com:19302',
