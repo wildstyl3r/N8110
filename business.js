@@ -102,10 +102,11 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
           
           if (hasSrflx) {
             console.log(`  ✅ ${stunUrl} - WORKING (srflx candidate received)`);
+
+          resolve();
           } else {
             console.log(`  ❌ ${stunUrl} - FAILED (no srflx candidates)`);
           }
-          resolve();
         }
       };
 
