@@ -5,6 +5,7 @@ const { circuitRelayTransport, circuitRelayServer } = window.Libp2PCircuitRelayV
 const { createLibp2p } = window.Libp2P; 
 const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
+const { identify } = window.Libp2PIdentify;
 let dataPc = null;
 let mediaPc = null;
 let localStream = null;
@@ -407,7 +408,7 @@ async testRelayConnection(relayMultiaddr) {
     streamMuxers: [yamux()],
     peerDiscovery: [],
     services: {
-      relay: circuitRelayServer()
+      identify: identify()
     }
   });
   
