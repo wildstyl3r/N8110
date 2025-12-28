@@ -58,7 +58,7 @@ function testICE() {
 async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
   for (const domain of domainList) {
     const stunUrl = `stun:${domain}`;
-    console.log(`Testing STUN server: ${stunUrl}`);
+    ui.logUI(`Testing STUN server: ${stunUrl}`);
     
     const config = {
       iceServers: [{ urls: stunUrl }]
@@ -74,7 +74,7 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
         if (!resolved) {
           resolved = true;
           pc.close();
-          console.log(`  ❌ ${stunUrl} - TIMEOUT (no response within ${timeout}ms)`);
+          ui.logUI(`  ❌ ${stunUrl} - TIMEOUT (no response within ${timeout}ms)`);
           resolve(false);
         }
       }, timeout);
@@ -85,7 +85,7 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
           if (event.candidate.type === 'srflx') {
             resolved = true;
             pc.close();
-            console.log(`  ✅ ${stunUrl} - WORKING (srflx candidate: ${event.candidate.address}:${event.candidate.port})`);
+            ui.logUI(`  ✅ ${stunUrl} - WORKING (srflx candidate: ${event.candidate.address}:${event.candidate.port})`);
             resolve(true);
           }
         }
@@ -96,7 +96,7 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
         if (pc.iceGatheringState === 'complete' && !resolved) {
           resolved = true;
           pc.close();
-          console.log(`  ❌ ${stunUrl} - FAILED (no srflx candidates gathered)`);
+          ui.logUI(`  ❌ ${stunUrl} - FAILED (no srflx candidates gathered)`);
           resolve(false);
         }
       };
@@ -123,7 +123,7 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
     // Small delay between tests
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  console.log('STUN server testing completed.');
+  ui.logUI('STUN server testing completed.');
 }
 
 
