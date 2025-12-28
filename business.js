@@ -11,11 +11,11 @@ const config = {
         // {urls: 'stun:stun.arbuz.ru:3478'},
         // {urls: 'stun:stun.comtube.ru:3478'},
         // {urls: 'stun:stun.demos.ru:3478'},
-        {urls: 'stun:stun.sipnet.ru:3478'},
-        // {urls: 'stun:stun.skylink.ru:3478'},
-        {urls: 'stun:stun.tagan.ru:3478'},
-        {urls: 'stun:stun.tatneft.ru:3478'},
-        {urls: 'stun:stun.tis-dialog.ru:3478'},
+        // {urls: 'stun:stun.sipnet.ru:3478'},
+        // // {urls: 'stun:stun.skylink.ru:3478'},
+        // {urls: 'stun:stun.tagan.ru:3478'},
+        // {urls: 'stun:stun.tatneft.ru:3478'},
+        // {urls: 'stun:stun.tis-dialog.ru:3478'},
     ] 
 };
 
