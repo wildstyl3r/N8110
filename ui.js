@@ -122,7 +122,6 @@ function logUI(message, data = null) {
 }
 
 // Event Listeners
-elements.testCircBtn.addEventListener('click', window.business.testCircuitRelays);
 
 elements.resetBtn.addEventListener('click', ui.resetUI);
 

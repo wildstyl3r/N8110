@@ -143,8 +143,8 @@ async function testRelayConnection(relayMultiaddr) {
 
 
 
-// Business Logic API
-const business = {
+// this Logic API
+window.business = {
     // Reset everything
     resetAll() {
         ui.logUI('🧹 Full reset');
@@ -207,7 +207,7 @@ const business = {
             sdpLength: sdp.length,
             iceState: connection.iceGatheringState
         });
-        return business.encodeChunks(sdp,type);
+        return this.encodeChunks(sdp,type);
     },
 
     // Chunk encoding
@@ -247,7 +247,7 @@ const business = {
     },
 
     async createDataOffer() {
-        business.resetAll();
+        this.resetAll();
         
         try{
             dataPc = new RTCPeerConnection(config);
@@ -275,7 +275,7 @@ const business = {
                         ui.updateStatus('✅ Data link established! Ready for video.');
                         ui.showVideoControls();
                     };
-                    dataChannel.onmessage = business.handleDataChannelMessage;
+                    dataChannel.onmessage = this.handleDataChannelMessage;
                 }
             };
             
@@ -287,7 +287,7 @@ const business = {
             });
             await dataPc.setLocalDescription(offer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
-            ui.storeOfferData(business.getSDPEncoded(dataPc, 'offer'));
+            ui.storeOfferData(this.getSDPEncoded(dataPc, 'offer'));
         } catch (err) {
             ui.logUI(`❌ DATA OFFER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
@@ -296,13 +296,13 @@ const business = {
     },
 
     async createDataAnswer() {
-        business.resetAll();
+        this.resetAll();
         
         const rawData = ui.getPasteData();
         if (!rawData) throw new Error('Paste data offer first');
         
         try {
-            const offerSdp = business.decodeChunks(rawData, 'offer');
+            const offerSdp = this.decodeChunks(rawData, 'offer');
             
             dataPc = new RTCPeerConnection(config);
             
@@ -314,14 +314,14 @@ const business = {
                     ui.updateStatus('✅ Data link ready! Video controls unlocked.');
                     ui.showVideoControls();
                 };
-                dataChannel.onmessage = business.handleDataChannelMessage;
+                dataChannel.onmessage = this.handleDataChannelMessage;
             };
 
             await dataPc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
             const answer = await dataPc.createAnswer();
             await dataPc.setLocalDescription(answer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
-            ui.storeAnswerData(business.getSDPEncoded(dataPc, 'answer'));
+            ui.storeAnswerData(this.getSDPEncoded(dataPc, 'answer'));
         } catch (err) {
             ui.logUI(`❌ DATA ANSWER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
@@ -335,9 +335,9 @@ const business = {
             ui.logUI(`📨 Data channel: ${msg.type}`);
             
             if (msg.type === 'video-offer') {
-                business.handleVideoOffer(msg.sdp);
+                this.handleVideoOffer(msg.sdp);
             } else if (msg.type === 'video-answer') {
-                business.handleVideoAnswer(msg.sdp);
+                this.handleVideoAnswer(msg.sdp);
             }
         } catch (err) {
             ui.logUI(`❌ Data message error: ${err.message}`);
@@ -345,7 +345,7 @@ const business = {
     },
 
     async initMediaChannel(initType, sdpData) {
-        const mediaStream = await business.setupMedia();
+        const mediaStream = await this.setupMedia();
         if (!mediaStream) {
             ui.updateStatus('Failed to init media channel');
             return false;
@@ -360,7 +360,7 @@ const business = {
         };
         
         if (initType === 'answer') {
-            await mediaPc.setRemoteDescription({ type: 'offer', sdp: business.decodeChunks(sdpData, 'offer') });
+            await mediaPc.setRemoteDescription({ type: 'offer', sdp: this.decodeChunks(sdpData, 'offer') });
         }
         
         const description = await (initType === "offer" ? mediaPc.createOffer() : mediaPc.createAnswer());
@@ -369,7 +369,7 @@ const business = {
         // Send answer BACK via data channel
         dataChannel.send(JSON.stringify({
             type: 'video-'+initType,
-            sdp: business.encodeChunks(mediaPc.localDescription.sdp, initType)
+            sdp: this.encodeChunks(mediaPc.localDescription.sdp, initType)
         }));
         return true;
     },
@@ -377,7 +377,7 @@ const business = {
     async handleVideoOffer(sdpData) {
         ui.logUI('🔄 Processing video offer');
         try{
-            if (business.initMediaChannel('answer', sdpData)) {
+            if (this.initMediaChannel('answer', sdpData)) {
                 ui.updateStatus('✅ Video connected!');
             }
         } catch (err) {
@@ -388,7 +388,7 @@ const business = {
     },
 
     async handleVideoAnswer(sdpData) {
-        const answerSdp = business.decodeChunks(sdpData, 'answer');
+        const answerSdp = this.decodeChunks(sdpData, 'answer');
         await mediaPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
         ui.logUI('✅ Video answer applied');
         ui.updateStatus('✅ Video call live!');
@@ -412,7 +412,7 @@ const business = {
         
         ui.logUI('🎥 Creating video offer');
         try {
-            if (business.initMediaChannel('offer')) {
+            if (this.initMediaChannel('offer')) {
                 ui.updateStatus('📤 Video offer sent via data channel...');
             }
         } catch (err) {
@@ -427,7 +427,7 @@ const business = {
             const rawData = ui.getPasteData();
             if (!rawData) throw new Error('Paste answer first');
             
-            const fullSdp = business.decodeChunks(rawData, 'answer');
+            const fullSdp = this.decodeChunks(rawData, 'answer');
             
             if (!dataPc)  {
                 ui.updateStatus(`❌ Create fresh offer first`);
@@ -455,4 +455,5 @@ const business = {
     }
 };
 
-window.business = business;
+
+ui.elements.testCircBtn.addEventListener('click', window.business.testCircuitRelays);
