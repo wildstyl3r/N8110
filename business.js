@@ -66,11 +66,12 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
     
     const promise = new Promise((resolve) => {
       let resolved = false;
+      let hasSrflx = false;
       
       const pc = new RTCPeerConnection(config);
       
       // Set timeout
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           pc.close();
@@ -82,7 +83,9 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
       // Check for successful STUN response (srflx candidate)
       pc.onicecandidate = (event) => {
         if (event.candidate && !resolved) {
+          ui.logUI(`  Candidate: ${event.candidate.candidate}`);
           if (event.candidate.type === 'srflx') {
+            hasSrflx = true;
             resolved = true;
             pc.close();
             ui.logUI(`  ✅ ${stunUrl} - WORKING (srflx candidate: ${event.candidate.address}:${event.candidate.port})`);
@@ -91,27 +94,49 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
         }
       };
       
-      // Handle ICE gathering completion
-      pc.onicegatheringstatechange = () => {
+      const checkGatheringComplete = () => {
         if (pc.iceGatheringState === 'complete' && !resolved) {
+          clearTimeout(timeoutId);
           resolved = true;
           pc.close();
-          ui.logUI(`  ❌ ${stunUrl} - FAILED (no srflx candidates gathered)`);
-          resolve(false);
+          
+          if (hasSrflx) {
+            console.log(`  ✅ ${stunUrl} - WORKING (srflx candidate received)`);
+          } else {
+            console.log(`  ❌ ${stunUrl} - FAILED (no srflx candidates)`);
+          }
+          resolve();
         }
       };
+
+      // Handle ICE gathering completion
+      pc.onicegatheringstatechange = checkGatheringComplete;
       
       // Create data channel to trigger ICE gathering
       pc.createDataChannel('test');
       pc.createOffer().then(offer => pc.setLocalDescription(offer))
+      .then(() => {
+          // Force gathering complete check after short delay
+          setTimeout(checkGatheringComplete, 100);
+        })
         .catch(err => {
           if (!resolved) {
+            clearTimeout(timeoutId);
             resolved = true;
             pc.close();
             console.error(`  ❌ ${stunUrl} - ERROR creating offer:`, err.message);
             resolve(false);
           }
         });
+        pc.oniceconnectionstatechange = () => {
+        if (['failed', 'closed'].includes(pc.iceConnectionState) && !resolved) {
+          clearTimeout(timeoutId);
+          resolved = true;
+          pc.close();
+          console.log(`  ❌ ${stunUrl} - ICE STATE: ${pc.iceConnectionState}`);
+          resolve();
+        }
+      };
     });
     
     try {
