@@ -2,7 +2,7 @@
 
 import { ui } from './ui.js';
 const { circuitRelayTransport } = window.Libp2PCircuitRelayV2;
-const Libp2P = window.Libp2P; 
+const { createLibp2p } = window.Libp2P; 
 const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
 let dataPc = null;
@@ -396,7 +396,7 @@ async  testSingleRelay(relayMultiaddr, timeout) {
 
 async testRelayConnection(relayMultiaddr) {
   // Create libp2p node with WebRTC + Circuit Relay
-  const node = await Libp2P.create({
+  const node = await createLibp2p({
     addresses: {
       listen: ['/webrtc']
     },
