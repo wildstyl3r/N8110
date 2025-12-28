@@ -1,5 +1,12 @@
-/*global ui, pako */
 // Global state
+
+import { ui } from './ui.js';
+import pako from 'pako';
+import { createLibp2p } from 'libp2p';
+import { webRTC } from 'libp2p-webrtc';
+import { circuitRelayTransport } from 'libp2p-circuit';
+import { noise } from 'libp2p-noise';
+import { yamux } from 'libp2p-yamux';
 let dataPc = null;
 let mediaPc = null;
 let localStream = null;
@@ -92,16 +99,16 @@ async function testSingleRelay(relayMultiaddr, timeout) {
 
 async function testRelayConnection(relayMultiaddr) {
   // Create libp2p node with WebRTC + Circuit Relay
-  const node = await Libp2p.create({
+  const node = await createLibp2p({
     addresses: {
       listen: ['/webrtc']
     },
     transports: [
-      new WebRTCDirect(),
+      webRTC(),
       circuitRelayTransport()
     ],
-    connectionEncryption: [new WebRTC()],
-    streamMuxers: [new LengthPrefixedStreamMuxer()],
+    connectionEncryption: [noise()],
+    streamMuxers: [yamux()],
     peerDiscovery: []
   });
   

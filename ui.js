@@ -1,4 +1,36 @@
-/*global Telegram, business, ui */
+/*global Telegram */
+
+function updateTheme() {
+    ['bg_color', 'text_color', 'button_color', 'button_text_color', 'secondary_bg_color', 'hint_color']
+        .forEach(param => {
+            if (Telegram.WebApp.themeParams[param]) {
+                document.documentElement.style.setProperty(
+                    `--tg-theme-${param.replace('_', '-')}`, 
+                    Telegram.WebApp.themeParams[param]
+                );
+            }
+        });
+}
+Telegram.WebApp.onEvent('themeChanged', updateTheme);
+
+document.addEventListener('DOMContentLoaded', () => {
+        // Telegram init (UI only)
+        Telegram.WebApp.ready();
+        Telegram.WebApp.hideKeyboard();
+        Telegram.WebApp.enableVerticalSwipes();
+        Telegram.WebApp.enableClosingConfirmation();
+        // Telegram.WebApp.expand();
+        if (navigator.userAgent.includes('TelegramAndroid')) {
+            document.addEventListener('DOMContentLoaded', () => {
+                // Telegram.WebApp.expand();
+                // Force hardware acceleration
+                document.body.style.transform = 'translateZ(0)';
+            });
+        }
+        
+        // Theme sync
+    updateTheme();  // Initial theme
+});
 
 const elements = {
     dataOfferActionBtn: document.getElementById('dataOfferAction'),
@@ -91,7 +123,7 @@ elements.useDataBtn.addEventListener('click', async () => {
     setButtonStatus('use', 'processing');
     
     try {
-        await business.useRemoteData();
+        await window.business.useRemoteData();
     } catch (err) {
         ui.logUI(`❌ Use data failed: ${err.message}`);
         setButtonStatus('use', ''); 
@@ -104,7 +136,7 @@ elements.dataOfferActionBtn.addEventListener('click', async () => {
     elements.dataOfferActionBtn.disabled = true;
     setButtonStatus('offer', 'processing');
     try {
-        await business.createDataOffer();
+        await window.business.createDataOffer();
     } catch (err) {
         ui.logUI(`❌ Data offer failed: ${err.message}`);
     } finally {
@@ -116,7 +148,7 @@ elements.dataAnswerActionBtn.addEventListener('click', async () => {
     elements.dataAnswerActionBtn.disabled = true;
     setButtonStatus('answer', 'processing');
     try {
-        await business.createDataAnswer();
+        await window.business.createDataAnswer();
     } catch (err) {
         ui.logUI(`❌ Data answer failed: ${err.message}`);
     } finally {
@@ -134,7 +166,7 @@ elements.videoOfferActionBtn.addEventListener('click', async () => {
     elements.videoOfferActionBtn.disabled = true;
     elements.videoOfferActionBtn.textContent = '🔄 Starting...';
     try {
-        await business.createVideoOffer();
+        await window.business.createVideoOffer();
     } catch (err) {
         ui.logUI(`❌ Video offer failed: ${err.message}`);
     } finally {
@@ -143,8 +175,8 @@ elements.videoOfferActionBtn.addEventListener('click', async () => {
     }
 });
 
-// Public UI API for business logic
-window.ui = {
+// Public UI API for window.business logic
+export const ui = {
     setButtonStatus,
     storeOfferData: (data) => { offerData = data; setButtonStatus('offer', 'success'); },
     storeAnswerData: (data) => { answerData = data; setButtonStatus('answer', 'success'); elements.videoControls.style.display = 'block'; },
@@ -191,3 +223,4 @@ window.ui = {
         updateStatus('🧹 Reset complete');
     }
 };
+window.uiReady = true;

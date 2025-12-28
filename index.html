@@ -54,37 +54,22 @@
         <button onclick="resetConnection()" class="debug-btn">🔄 Reset All</button>
     </div>
 
-    <script src="ui.js"></script>
-    <script src="business.js"></script>
-    <script>
-        // Telegram init (UI only)
-        Telegram.WebApp.ready();
-        Telegram.WebApp.hideKeyboard();
-        Telegram.WebApp.enableVerticalSwipes();
-        Telegram.WebApp.enableClosingConfirmation();
-        // Telegram.WebApp.expand();
-        if (navigator.userAgent.includes('TelegramAndroid')) {
-            document.addEventListener('DOMContentLoaded', () => {
-                // Telegram.WebApp.expand();
-                // Force hardware acceleration
-                document.body.style.transform = 'translateZ(0)';
-            });
-        }
-        
-        // Theme sync
-        function updateTheme() {
-            ['bg_color', 'text_color', 'button_color', 'button_text_color', 'secondary_bg_color', 'hint_color']
-                .forEach(param => {
-                    if (Telegram.WebApp.themeParams[param]) {
-                        document.documentElement.style.setProperty(
-                            `--tg-theme-${param.replace('_', '-')}`, 
-                            Telegram.WebApp.themeParams[param]
-                        );
-                    }
-                });
-        }
-        updateTheme();
-        Telegram.WebApp.onEvent('themeChanged', updateTheme);
+    <script type="importmap">
+    {
+    "imports": {
+        "pako": "https://cdn.skypack.dev/pako@2.1.0",
+        "libp2p": "https://unpkg.com/libp2p@3.1.2/dist/index.min.js",
+        "libp2p-wrtc": "https://unpkg.com/@libp2p/webrtc@6.0.10/dist/index.min.js",
+        "libp2p-circuit": "https://unpkg.com/@libp2p/circuit-relay-v2@4.1.2/dist/index.min.js",
+        "libp2p-noise": "https://cdn.skypack.dev/@chainsafe/libp2p-noise",
+        "libp2p-yamux": "https://cdn.skypack.dev/@chainsafe/libp2p-yamux",
+    }
+    }
+    </script>
+
+    <script type="module">
+    import './ui.js';
+    import './business.js';
     </script>
 </body>
 </html>
