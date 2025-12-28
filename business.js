@@ -49,7 +49,7 @@ const config = {
 
 
 
-// this Logic API
+// window.business Logic API
 window.business = {
     // Reset everything
     resetAll() {
@@ -113,7 +113,7 @@ window.business = {
             sdpLength: sdp.length,
             iceState: connection.iceGatheringState
         });
-        return this.encodeChunks(sdp,type);
+        return window.business.encodeChunks(sdp,type);
     },
 
     // Chunk encoding
@@ -153,7 +153,7 @@ window.business = {
     },
 
     async createDataOffer() {
-        this.resetAll();
+        window.business.resetAll();
         
         try{
             dataPc = new RTCPeerConnection(config);
@@ -181,7 +181,7 @@ window.business = {
                         ui.updateStatus('✅ Data link established! Ready for video.');
                         ui.showVideoControls();
                     };
-                    dataChannel.onmessage = this.handleDataChannelMessage;
+                    dataChannel.onmessage = window.business.handleDataChannelMessage;
                 }
             };
             
@@ -193,7 +193,7 @@ window.business = {
             });
             await dataPc.setLocalDescription(offer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
-            ui.storeOfferData(this.getSDPEncoded(dataPc, 'offer'));
+            ui.storeOfferData(window.business.getSDPEncoded(dataPc, 'offer'));
         } catch (err) {
             ui.logUI(`❌ DATA OFFER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
@@ -202,13 +202,13 @@ window.business = {
     },
 
     async createDataAnswer() {
-        this.resetAll();
+        window.business.resetAll();
         
         const rawData = ui.getPasteData();
         if (!rawData) throw new Error('Paste data offer first');
         
         try {
-            const offerSdp = this.decodeChunks(rawData, 'offer');
+            const offerSdp = window.business.decodeChunks(rawData, 'offer');
             
             dataPc = new RTCPeerConnection(config);
             
@@ -220,14 +220,14 @@ window.business = {
                     ui.updateStatus('✅ Data link ready! Video controls unlocked.');
                     ui.showVideoControls();
                 };
-                dataChannel.onmessage = this.handleDataChannelMessage;
+                dataChannel.onmessage = window.business.handleDataChannelMessage;
             };
 
             await dataPc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
             const answer = await dataPc.createAnswer();
             await dataPc.setLocalDescription(answer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
-            ui.storeAnswerData(this.getSDPEncoded(dataPc, 'answer'));
+            ui.storeAnswerData(window.business.getSDPEncoded(dataPc, 'answer'));
         } catch (err) {
             ui.logUI(`❌ DATA ANSWER ERROR: ${err.message}`);
             ui.updateStatus(`❌ ${err.message}`);
@@ -241,9 +241,9 @@ window.business = {
             ui.logUI(`📨 Data channel: ${msg.type}`);
             
             if (msg.type === 'video-offer') {
-                this.handleVideoOffer(msg.sdp);
+                window.business.handleVideoOffer(msg.sdp);
             } else if (msg.type === 'video-answer') {
-                this.handleVideoAnswer(msg.sdp);
+                window.business.handleVideoAnswer(msg.sdp);
             }
         } catch (err) {
             ui.logUI(`❌ Data message error: ${err.message}`);
@@ -251,7 +251,7 @@ window.business = {
     },
 
     async initMediaChannel(initType, sdpData) {
-        const mediaStream = await this.setupMedia();
+        const mediaStream = await window.business.setupMedia();
         if (!mediaStream) {
             ui.updateStatus('Failed to init media channel');
             return false;
@@ -266,7 +266,7 @@ window.business = {
         };
         
         if (initType === 'answer') {
-            await mediaPc.setRemoteDescription({ type: 'offer', sdp: this.decodeChunks(sdpData, 'offer') });
+            await mediaPc.setRemoteDescription({ type: 'offer', sdp: window.business.decodeChunks(sdpData, 'offer') });
         }
         
         const description = await (initType === "offer" ? mediaPc.createOffer() : mediaPc.createAnswer());
@@ -275,7 +275,7 @@ window.business = {
         // Send answer BACK via data channel
         dataChannel.send(JSON.stringify({
             type: 'video-'+initType,
-            sdp: this.encodeChunks(mediaPc.localDescription.sdp, initType)
+            sdp: window.business.encodeChunks(mediaPc.localDescription.sdp, initType)
         }));
         return true;
     },
@@ -283,7 +283,7 @@ window.business = {
     async handleVideoOffer(sdpData) {
         ui.logUI('🔄 Processing video offer');
         try{
-            if (this.initMediaChannel('answer', sdpData)) {
+            if (window.business.initMediaChannel('answer', sdpData)) {
                 ui.updateStatus('✅ Video connected!');
             }
         } catch (err) {
@@ -294,7 +294,7 @@ window.business = {
     },
 
     async handleVideoAnswer(sdpData) {
-        const answerSdp = this.decodeChunks(sdpData, 'answer');
+        const answerSdp = window.business.decodeChunks(sdpData, 'answer');
         await mediaPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
         ui.logUI('✅ Video answer applied');
         ui.updateStatus('✅ Video call live!');
@@ -318,7 +318,7 @@ window.business = {
         
         ui.logUI('🎥 Creating video offer');
         try {
-            if (this.initMediaChannel('offer')) {
+            if (window.business.initMediaChannel('offer')) {
                 ui.updateStatus('📤 Video offer sent via data channel...');
             }
         } catch (err) {
@@ -333,7 +333,7 @@ window.business = {
             const rawData = ui.getPasteData();
             if (!rawData) throw new Error('Paste answer first');
             
-            const fullSdp = this.decodeChunks(rawData, 'answer');
+            const fullSdp = window.business.decodeChunks(rawData, 'answer');
             
             if (!dataPc)  {
                 ui.updateStatus(`❌ Create fresh offer first`);
@@ -373,7 +373,7 @@ async testCircuitRelays(timeout = 10000) {
     console.log(`Testing Circuit Relay: ${relayMultiaddr}`);
     
     try {
-      await this.testSingleRelay(relayMultiaddr, timeout);
+      await window.business.testSingleRelay(relayMultiaddr, timeout);
     } catch (error) {
       console.error(`  ❌ ${relayMultiaddr} - TEST FAILED:`, error.message);
     }
@@ -387,7 +387,7 @@ async testCircuitRelays(timeout = 10000) {
 
 async  testSingleRelay(relayMultiaddr, timeout) {
   return Promise.race([
-    this.testRelayConnection(relayMultiaddr),
+    window.business.testRelayConnection(relayMultiaddr),
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error('TIMEOUT')), timeout)
     )
