@@ -2,6 +2,7 @@
 
 import { ui } from './ui.js';
 const { circuitRelayTransport } = window.Libp2PCircuitRelayV2;
+const { webSockets } = window.Libp2PWebsockets;
 const { createLibp2p } = window.Libp2P; 
 const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
@@ -369,11 +370,13 @@ async testCircuitRelays() {
   console.log('Testing libp2p bootstraping...');
   if (node) await node.stop();
   node = await createLibp2p({
+    start:false,
     addresses: {
       listen: ['/p2p-circuit']
     },
     transports: [
-      circuitRelayTransport()
+      circuitRelayTransport(),
+      webSockets(),
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
@@ -404,6 +407,10 @@ async testCircuitRelays() {
   node.addEventListener('peer:discovery', (evt) => {
     console.log('found peer: ', evt.detail.toString())
     });
+await node.start();
+console.log('libp2p has started');
+const listenAddresses = node.getMultiaddrs();
+console.log('libp2p is listening on the following addresses: ', listenAddresses);
 },
 
 
