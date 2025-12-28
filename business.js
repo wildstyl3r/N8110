@@ -55,105 +55,98 @@ function testICE() {
     }
 }
 
-async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
-  for (const domain of domainList) {
-    const stunUrl = `stun:${domain}`;
-    ui.logUI(`Testing STUN server: ${stunUrl}`);
+const relayList = [
+//   '/p2p/Qm.../p2p-circuit',  // Replace with actual relay multiaddrs
+  '/ip4/relay.example.com/tcp/4001/p2p/QmRelayPeer/p2p-circuit',
+  '/dns4/relay.libp2p.io/tcp/4001/p2p-circuit'
+];
+
+async function testCircuitRelays(relayMultiaddrs=relayList, timeout = 10000) {
+  ui.logUI('Testing libp2p Circuit Relay servers...');
+  
+  for (const relayAddr of relayMultiaddrs) {
+    const relayMultiaddr = `/p2p-circuit${relayAddr}`; // Full relay multiaddr
+    ui.logUI(`Testing Circuit Relay: ${relayMultiaddr}`);
     
-    const config = {
-      iceServers: [{ urls: stunUrl }]
-    };
+    let resolved = false;
+    let connected = false;
     
-    const promise = new Promise((resolve) => {
-      let resolved = false;
-      let hasSrflx = false;
+    try {
+      // Create test libp2p node
+      const node = await Libp2p.create({
+        addresses: {
+          listen: ['/webrtc'] // Browser listens on WebRTC
+        },
+        transports: [
+          new WebRTCDirect(),
+          circuitRelayTransport()
+        ],
+        connectionEncryption: [new WebRTC()],
+        streamMuxers: [new WebMuxer()],
+        peerDiscovery: []
+      });
       
-      const pc = new RTCPeerConnection(config);
+      // Connect to relay and test circuit reservation
+      const relayPeerId = /* extract peer ID from multiaddr */;
+      await node.dial(relayMultiaddr);
       
-      // Set timeout
-      const timeoutId = setTimeout(() => {
+      // Wait for connection
+      const checkConnection = () => {
+        if (node.getPeers().length > 0) {
+          connected = true;
+        }
+      };
+      
+      node.addEventListener('peer:connect', () => {
+        ui.logUI(`  ✅ Connected to relay: ${relayMultiaddr}`);
+        connected = true;
+        resolved = true;
+        node.stop();
+      });
+      
+      node.addEventListener('peer:disconnect', () => {
+        ui.logUI(`  ❌ Disconnected from: ${relayMultiaddr}`);
+      });
+      
+      // Timeout
+      setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          pc.close();
-          ui.logUI(`  ❌ ${stunUrl} - TIMEOUT (no response within ${timeout}ms)`);
-          resolve(false);
+          node.stop();
+          ui.logUI(`  ❌ ${relayMultiaddr} - TIMEOUT`);
         }
       }, timeout);
       
-      // Check for successful STUN response (srflx candidate)
-      pc.onicecandidate = (event) => {
-        if (event.candidate && !resolved) {
-          ui.logUI(`  Candidate: ${event.candidate.candidate}`);
-          if (event.candidate.type === 'srflx') {
-            hasSrflx = true;
-            resolved = true;
-            pc.close();
-            ui.logUI(`  ✅ ${stunUrl} - WORKING (srflx candidate: ${event.candidate.address}:${event.candidate.port})`);
-            resolve(true);
-          }
-        }
-      };
+      await node.start();
       
-      const checkGatheringComplete = () => {
-        if (pc.iceGatheringState === 'complete' && !resolved) {
-          clearTimeout(timeoutId);
-          resolved = true;
-          pc.close();
-          
-          if (hasSrflx) {
-            console.log(`  ✅ ${stunUrl} - WORKING (srflx candidate received)`);
-
-          } else {
-            console.log(`  ❌ ${stunUrl} - FAILED (no srflx candidates)`);
-          }
-
-          resolve();
-        }
-      };
-
-      // Handle ICE gathering completion
-      pc.onicegatheringstatechange = checkGatheringComplete;
+      // Test circuit reservation (make self dialable via relay)
+      try {
+        await node.services.circuitRelayServer.reserve();
+        ui.logUI(`  ✅ ${relayMultiaddr} - Circuit reservation SUCCESS`);
+      } catch (err) {
+        ui.logUI(`  ❌ ${relayMultiaddr} - Circuit reservation FAILED:`, err.message);
+      }
       
-      // Create data channel to trigger ICE gathering
-      pc.createDataChannel('test');
-      pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
-            }).then(offer => pc.setLocalDescription(offer))
-      .then(() => {
-          // Force gathering complete check after short delay
-          setTimeout(checkGatheringComplete, 100);
-        })
-        .catch(err => {
-          if (!resolved) {
-            clearTimeout(timeoutId);
-            resolved = true;
-            pc.close();
-            console.error(`  ❌ ${stunUrl} - ERROR creating offer:`, err.message);
-            resolve(false);
-          }
-        });
-        pc.oniceconnectionstatechange = () => {
-        if (['failed', 'closed'].includes(pc.iceConnectionState) && !resolved) {
-          clearTimeout(timeoutId);
-          resolved = true;
-          pc.close();
-          console.log(`  ❌ ${stunUrl} - ICE STATE: ${pc.iceConnectionState}`);
-          resolve();
-        }
-      };
-    });
-    
-    try {
-      await promise;
+      // Synchronous wait loop
+      while (!resolved) {
+        checkConnection();
+        for (let i = 0; i < 100 && !resolved; i++) {}
+      }
+      
     } catch (error) {
-      console.error(`  ❌ ${stunUrl} - UNEXPECTED ERROR:`, error.message);
+      console.error(`  ❌ ${relayMultiaddr} - SETUP ERROR:`, error.message);
     }
     
-    // Small delay between tests
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Delay between tests
+    const delay = new Promise(r => setTimeout(r, 500));
+    let delayDone = false;
+    setTimeout(() => { delayDone = true; }, 500);
+    while (!delayDone) {
+      for (let i = 0; i < 100; i++) {}
+    }
   }
-  ui.logUI('STUN server testing completed.');
+  
+  ui.logUI('Circuit Relay testing completed.');
 }
 
 
