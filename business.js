@@ -360,14 +360,13 @@ window.business = {
         }
     },
 
-    relayList: [
+async testCircuitRelays(timeout = 10000) {
+  console.log('Testing libp2p Circuit Relay servers...');
+  const relayMultiaddrs = [
 //   '/p2p/Qm.../p2p-circuit',  // Replace with actual relay multiaddrs
   '/ip4/relay.example.com/tcp/4001/p2p/QmRelayPeer/p2p-circuit',
   '/dns4/relay.libp2p.io/tcp/4001/p2p-circuit'
-],
-
-async testCircuitRelays(relayMultiaddrs=this.relayList, timeout = 10000) {
-  console.log('Testing libp2p Circuit Relay servers...');
+];
   
   for (const relayAddr of relayMultiaddrs) {
     const relayMultiaddr = `/p2p-circuit${relayAddr}`;
