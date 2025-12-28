@@ -4,6 +4,26 @@ let dataPc = null;
 let mediaPc = null;
 let localStream = null;
 let dataChannel = null;
+
+const stunDomains = [
+  'stun.l.google.com:19302',
+  'stun1.l.google.com:19302',
+  'stun2.l.google.com:19302',
+  'stun3.l.google.com:19302',
+  'stun4.l.google.com:19302',
+  'stunserver.org',
+  'stun.stunprotocol.org',
+  'nonexistent.stunserver123.xyz', // This will fail
+  'stun.qq.com:3478',
+  'stun.arbuz.ru:3478',
+  'stun.comtube.ru:3478',
+  'stun.demos.ru:3478',
+  'stun.sipnet.ru:3478',
+  'stun.skylink.ru:3478',
+  'stun.tagan.ru:3478',
+  'stun.tatneft.ru:3478',
+  'stun.tis-dialog.ru:3478',
+];
 const config = { 
     iceServers: [
         {urls: 'stun:stun.qq.com:3478'},
@@ -34,6 +54,79 @@ function testICE() {
         });
     }
 }
+
+async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
+  for (const domain of domainList) {
+    const stunUrl = `stun:${domain}`;
+    console.log(`Testing STUN server: ${stunUrl}`);
+    
+    const config = {
+      iceServers: [{ urls: stunUrl }]
+    };
+    
+    const promise = new Promise((resolve) => {
+      let resolved = false;
+      
+      const pc = new RTCPeerConnection(config);
+      
+      // Set timeout
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          pc.close();
+          console.log(`  ❌ ${stunUrl} - TIMEOUT (no response within ${timeout}ms)`);
+          resolve(false);
+        }
+      }, timeout);
+      
+      // Check for successful STUN response (srflx candidate)
+      pc.onicecandidate = (event) => {
+        if (event.candidate && !resolved) {
+          if (event.candidate.type === 'srflx') {
+            resolved = true;
+            pc.close();
+            console.log(`  ✅ ${stunUrl} - WORKING (srflx candidate: ${event.candidate.address}:${event.candidate.port})`);
+            resolve(true);
+          }
+        }
+      };
+      
+      // Handle ICE gathering completion
+      pc.onicegatheringstatechange = () => {
+        if (pc.iceGatheringState === 'complete' && !resolved) {
+          resolved = true;
+          pc.close();
+          console.log(`  ❌ ${stunUrl} - FAILED (no srflx candidates gathered)`);
+          resolve(false);
+        }
+      };
+      
+      // Create data channel to trigger ICE gathering
+      pc.createDataChannel('test');
+      pc.createOffer().then(offer => pc.setLocalDescription(offer))
+        .catch(err => {
+          if (!resolved) {
+            resolved = true;
+            pc.close();
+            console.error(`  ❌ ${stunUrl} - ERROR creating offer:`, err.message);
+            resolve(false);
+          }
+        });
+    });
+    
+    try {
+      await promise;
+    } catch (error) {
+      console.error(`  ❌ ${stunUrl} - UNEXPECTED ERROR:`, error.message);
+    }
+    
+    // Small delay between tests
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  console.log('STUN server testing completed.');
+}
+
+
 
 // Business Logic API
 const business = {
