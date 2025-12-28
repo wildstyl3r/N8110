@@ -407,7 +407,13 @@ async testCircuitRelays() {
   node.addEventListener('peer:discovery', (evt) => {
     console.log('found peer: ', evt.detail.toString())
     });
+console.log('libp2p prepared');
+try {
+
 await node.start();
+} catch (err) {
+    console.log(`error at startup: ${err}`)
+}
 console.log('libp2p has started');
 const listenAddresses = node.getMultiaddrs();
 console.log('libp2p is listening on the following addresses: ', listenAddresses);
