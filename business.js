@@ -62,92 +62,78 @@ const relayList = [
 ];
 
 async function testCircuitRelays(relayMultiaddrs=relayList, timeout = 10000) {
-  ui.logUI('Testing libp2p Circuit Relay servers...');
+  console.log('Testing libp2p Circuit Relay servers...');
   
   for (const relayAddr of relayMultiaddrs) {
-    const relayMultiaddr = `/p2p-circuit${relayAddr}`; // Full relay multiaddr
-    ui.logUI(`Testing Circuit Relay: ${relayMultiaddr}`);
-    
-    let resolved = false;
-    let connected = false;
+    const relayMultiaddr = `/p2p-circuit${relayAddr}`;
+    console.log(`Testing Circuit Relay: ${relayMultiaddr}`);
     
     try {
-      // Create test libp2p node
-      const node = await Libp2p.create({
-        addresses: {
-          listen: ['/webrtc'] // Browser listens on WebRTC
-        },
-        transports: [
-          new WebRTCDirect(),
-          circuitRelayTransport()
-        ],
-        connectionEncryption: [new WebRTC()],
-        streamMuxers: [new WebMuxer()],
-        peerDiscovery: []
-      });
-      
-      // Connect to relay and test circuit reservation
-    //   const relayPeerId = /* extract peer ID from multiaddr */;
-      await node.dial(relayMultiaddr);
-      
-      // Wait for connection
-      const checkConnection = () => {
-        if (node.getPeers().length > 0) {
-          connected = true;
-        }
-      };
+      await testSingleRelay(relayMultiaddr, timeout);
+    } catch (error) {
+      console.error(`  ❌ ${relayMultiaddr} - TEST FAILED:`, error.message);
+    }
+    
+    // Natural async delay between tests
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  console.log('Circuit Relay testing completed.');
+}
+
+async function testSingleRelay(relayMultiaddr, timeout) {
+  return Promise.race([
+    testRelayConnection(relayMultiaddr),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('TIMEOUT')), timeout)
+    )
+  ]);
+}
+
+async function testRelayConnection(relayMultiaddr) {
+  // Create libp2p node with WebRTC + Circuit Relay
+  const node = await Libp2p.create({
+    addresses: {
+      listen: ['/webrtc']
+    },
+    transports: [
+      new WebRTCDirect(),
+      circuitRelayTransport()
+    ],
+    connectionEncryption: [new WebRTC()],
+    streamMuxers: [new LengthPrefixedStreamMuxer()],
+    peerDiscovery: []
+  });
+  
+  try {
+    await node.start();
+    
+    // Dial relay and test circuit reservation
+    await node.dial(relayMultiaddr);
+    
+    // Wait for peer connection
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(reject, 5000, new Error('No peer connection'));
       
       node.addEventListener('peer:connect', () => {
-        ui.logUI(`  ✅ Connected to relay: ${relayMultiaddr}`);
-        connected = true;
-        resolved = true;
-        node.stop();
-      });
-      
+        clearTimeout(timeout);
+        console.log(`  ✅ Connected to relay: ${relayMultiaddr}`);
+        resolve();
+      }, { once: true });
       node.addEventListener('peer:disconnect', () => {
         ui.logUI(`  ❌ Disconnected from: ${relayMultiaddr}`);
       });
-      
-      // Timeout
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          node.stop();
-          ui.logUI(`  ❌ ${relayMultiaddr} - TIMEOUT`);
-        }
-      }, timeout);
-      
-      await node.start();
-      
-      // Test circuit reservation (make self dialable via relay)
-      try {
-        await node.services.circuitRelayServer.reserve();
-        ui.logUI(`  ✅ ${relayMultiaddr} - Circuit reservation SUCCESS`);
-      } catch (err) {
-        ui.logUI(`  ❌ ${relayMultiaddr} - Circuit reservation FAILED:`, err.message);
-      }
-      
-      // Synchronous wait loop
-      while (!resolved) {
-        checkConnection();
-        for (let i = 0; i < 100 && !resolved; i++) {}
-      }
-      
-    } catch (error) {
-      console.error(`  ❌ ${relayMultiaddr} - SETUP ERROR:`, error.message);
-    }
+    });
     
-    // Delay between tests
-    const delay = new Promise(r => setTimeout(r, 500));
-    let delayDone = false;
-    setTimeout(() => { delayDone = true; }, 500);
-    while (!delayDone) {
-      for (let i = 0; i < 100; i++) {}
-    }
+    // Test circuit reservation
+    await node.services.circuitRelayServer.reserve();
+    console.log(`  ✅ ${relayMultiaddr} - Circuit reservation SUCCESS`);
+    
+  } finally {
+    await node.stop();
   }
-  
-  ui.logUI('Circuit Relay testing completed.');
 }
+
 
 
 
