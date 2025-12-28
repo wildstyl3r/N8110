@@ -7,7 +7,15 @@ let dataChannel = null;
 const config = { 
     iceServers: [
         {urls: 'stun:stun.l.google.com:19302'},
-        {urls: 'stun:stun1.l.google.com:19302'}
+        {urls: 'stun:stun1.l.google.com:19302'},
+        {urls: 'stun.arbuz.ru:3478'},
+        {urls: 'stun.comtube.ru:3478'},
+        {urls: 'stun.demos.ru:3478'},
+        {urls: 'stun.sipnet.ru:3478'},
+        {urls: 'stun.skylink.ru:3478'},
+        {urls: 'stun.tagan.ru:3478'},
+        {urls: 'stun.tatneft.ru:3478'},
+        {urls: 'stun.tis-dialog.ru:3478'},
     ] 
 };
 
