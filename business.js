@@ -368,12 +368,12 @@ async testCircuitRelays() {
   if (node) await node.stop();
   node = await createLibp2p({
     addresses: {
-      listen: ['/webrtc']
+      listen: ['/p2p-circuit']
     },
     transports: [
       circuitRelayTransport()
     ],
-    connectionEncryption: [noise()],
+    connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     peerDiscovery: [
          bootstrap({
