@@ -173,8 +173,8 @@ const business = {
             
             // Minimal SDP - NO MEDIA
             const offer = await dataPc.createOffer({
-                offerToReceiveAudio: 0,
-                offerToReceiveVideo: 0,
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true,
                 iceRestart: false,
             });
             await dataPc.setLocalDescription(offer);
