@@ -46,100 +46,6 @@ const config = {
     ] 
 };
 
-function testICE() {
-    if (dataPc) {
-        ui.logUI('🔍 ICE Diagnostics:');
-        ui.logUI(`local: ${dataPc.localDescription?.type}`);
-        ui.logUI(`remote: ${dataPc.remoteDescription?.type}`);
-        ui.logUI(`signaling: ${dataPc.signalingState}`);
-        ui.logUI(`ice: ${dataPc.iceConnectionState}`);
-        ui.logUI(`gathering: ${dataPc.iceGatheringState}`);
-        
-        // Force ICE candidate gathering
-        dataPc.getSenders().forEach(sender => {
-            dataPc.addIceCandidate(null);  // Trigger gathering
-        });
-    }
-}
-
-const relayList = [
-//   '/p2p/Qm.../p2p-circuit',  // Replace with actual relay multiaddrs
-  '/ip4/relay.example.com/tcp/4001/p2p/QmRelayPeer/p2p-circuit',
-  '/dns4/relay.libp2p.io/tcp/4001/p2p-circuit'
-];
-
-async function testCircuitRelays(relayMultiaddrs=relayList, timeout = 10000) {
-  console.log('Testing libp2p Circuit Relay servers...');
-  
-  for (const relayAddr of relayMultiaddrs) {
-    const relayMultiaddr = `/p2p-circuit${relayAddr}`;
-    console.log(`Testing Circuit Relay: ${relayMultiaddr}`);
-    
-    try {
-      await testSingleRelay(relayMultiaddr, timeout);
-    } catch (error) {
-      console.error(`  ❌ ${relayMultiaddr} - TEST FAILED:`, error.message);
-    }
-    
-    // Natural async delay between tests
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  
-  console.log('Circuit Relay testing completed.');
-}
-
-async function testSingleRelay(relayMultiaddr, timeout) {
-  return Promise.race([
-    testRelayConnection(relayMultiaddr),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('TIMEOUT')), timeout)
-    )
-  ]);
-}
-
-async function testRelayConnection(relayMultiaddr) {
-  // Create libp2p node with WebRTC + Circuit Relay
-  const node = await Libp2P.create({
-    addresses: {
-      listen: ['/webrtc']
-    },
-    transports: [
-      circuitRelayTransport()
-    ],
-    connectionEncryption: [noise()],
-    streamMuxers: [yamux()],
-    peerDiscovery: []
-  });
-  
-  try {
-    await node.start();
-    
-    // Dial relay and test circuit reservation
-    await node.dial(relayMultiaddr);
-    
-    // Wait for peer connection
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(reject, 5000, new Error('No peer connection'));
-      
-      node.addEventListener('peer:connect', () => {
-        clearTimeout(timeout);
-        console.log(`  ✅ Connected to relay: ${relayMultiaddr}`);
-        resolve();
-      }, { once: true });
-      node.addEventListener('peer:disconnect', () => {
-        ui.logUI(`  ❌ Disconnected from: ${relayMultiaddr}`);
-      });
-    });
-    
-    // Test circuit reservation
-    await node.services.circuitRelayServer.reserve();
-    console.log(`  ✅ ${relayMultiaddr} - Circuit reservation SUCCESS`);
-    
-  } finally {
-    await node.stop();
-  }
-}
-
 
 
 
@@ -452,5 +358,83 @@ window.business = {
             ui.updateStatus(`❌ ${err.message}`);
             throw err;
         }
+    },
+
+    relayList: [
+//   '/p2p/Qm.../p2p-circuit',  // Replace with actual relay multiaddrs
+  '/ip4/relay.example.com/tcp/4001/p2p/QmRelayPeer/p2p-circuit',
+  '/dns4/relay.libp2p.io/tcp/4001/p2p-circuit'
+],
+
+async testCircuitRelays(relayMultiaddrs=this.relayList, timeout = 10000) {
+  console.log('Testing libp2p Circuit Relay servers...');
+  
+  for (const relayAddr of relayMultiaddrs) {
+    const relayMultiaddr = `/p2p-circuit${relayAddr}`;
+    console.log(`Testing Circuit Relay: ${relayMultiaddr}`);
+    
+    try {
+      await this.testSingleRelay(relayMultiaddr, timeout);
+    } catch (error) {
+      console.error(`  ❌ ${relayMultiaddr} - TEST FAILED:`, error.message);
     }
+    
+    // Natural async delay between tests
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  console.log('Circuit Relay testing completed.');
+},
+
+async  testSingleRelay(relayMultiaddr, timeout) {
+  return Promise.race([
+    this.testRelayConnection(relayMultiaddr),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('TIMEOUT')), timeout)
+    )
+  ]);
+},
+
+async testRelayConnection(relayMultiaddr) {
+  // Create libp2p node with WebRTC + Circuit Relay
+  const node = await Libp2P.create({
+    addresses: {
+      listen: ['/webrtc']
+    },
+    transports: [
+      circuitRelayTransport()
+    ],
+    connectionEncryption: [noise()],
+    streamMuxers: [yamux()],
+    peerDiscovery: []
+  });
+  
+  try {
+    await node.start();
+    
+    // Dial relay and test circuit reservation
+    await node.dial(relayMultiaddr);
+    
+    // Wait for peer connection
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(reject, 5000, new Error('No peer connection'));
+      
+      node.addEventListener('peer:connect', () => {
+        clearTimeout(timeout);
+        console.log(`  ✅ Connected to relay: ${relayMultiaddr}`);
+        resolve();
+      }, { once: true });
+      node.addEventListener('peer:disconnect', () => {
+        ui.logUI(`  ❌ Disconnected from: ${relayMultiaddr}`);
+      });
+    });
+    
+    // Test circuit reservation
+    await node.services.circuitRelayServer.reserve();
+    console.log(`  ✅ ${relayMultiaddr} - Circuit reservation SUCCESS`);
+    
+  } finally {
+    await node.stop();
+  }
+}
 };
