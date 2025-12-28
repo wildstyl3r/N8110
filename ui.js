@@ -49,7 +49,11 @@ const elements = {
     remoteVideo: document.getElementById('remoteVideo'),
     debugBtn: document.getElementById('debugBtn'),
     debugLogEl: document.getElementById('debugLog'),
-    useDataEmoji: document.querySelector('#useDataBtn .emoji')
+    useDataEmoji: document.querySelector('#useDataBtn .emoji'),
+
+    resetBtn: document.getElementById('resetBtn'),
+
+    testCircBtn: document.getElementById('testCircBtn')
 };
 
 // State (UI only)
@@ -118,6 +122,10 @@ function logUI(message, data = null) {
 }
 
 // Event Listeners
+elements.testCircBtn.addEventListener('click', window.business.testCircuitRelays);
+
+elements.resetBtn.addEventListener('click', ui.resetUI);
+
 elements.useDataBtn.addEventListener('click', async () => {
     elements.useDataBtn.disabled = true;
     setButtonStatus('use', 'processing');
