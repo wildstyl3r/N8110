@@ -19,6 +19,22 @@ const config = {
     ] 
 };
 
+function testICE() {
+    if (dataPc) {
+        ui.logUI('🔍 ICE Diagnostics:');
+        ui.logUI(`local: ${dataPc.localDescription?.type}`);
+        ui.logUI(`remote: ${dataPc.remoteDescription?.type}`);
+        ui.logUI(`signaling: ${dataPc.signalingState}`);
+        ui.logUI(`ice: ${dataPc.iceConnectionState}`);
+        ui.logUI(`gathering: ${dataPc.iceGatheringState}`);
+        
+        // Force ICE candidate gathering
+        dataPc.getSenders().forEach(sender => {
+            dataPc.addIceCandidate(null);  // Trigger gathering
+        });
+    }
+}
+
 // Business Logic API
 const business = {
     // Reset everything
@@ -89,15 +105,8 @@ const business = {
     // Chunk encoding
     encodeChunks(sdp, type) {
         ui.logUI(`🔄 Compressing ${sdp.length} chars SDP`);
-
-        const minimalSdp = sdp
-            .split('\n')
-            .filter(line => 
-                        !line.match(/candidate.*relay/)) // Skip TURN
-            .join('\n');
-        ui.logUI(`ℹ️ Minimal SDP is ${minimalSdp.length} chars`);
         
-        let base64 = btoa(String.fromCharCode(...pako.deflate(minimalSdp)));
+        let base64 = btoa(String.fromCharCode(...pako.deflate(sdp)));
         base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         
         let result = {"answer":"(a)","offer": "(o)"}[type]+base64;
@@ -137,9 +146,16 @@ const business = {
             dataPc.onnegotiationneeded = null;
 
             dataPc.onconnectionstatechange = () => ui.logUI(`Connection state: ${dataPc.connectionState}`);
-            dataPc.onicecandidate = (event) => { if (event.candidate) { ui.logUI('🧊 ICE candidate gathered'); } };
-            dataPc.onicegatheringstatechange = () => ui.logUI(`ICE state: ${dataPc.iceGatheringState}`);
+            dataPc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    ui.logUI('🧊 ICE candidate gathered');
+                } else {
+                    ui.logUI('🧊 ICE gathering complete');
+                }
+            };
+            dataPc.onicegatheringstatechange = () => ui.logUI(`ICE gathering: ${dataPc.iceGatheringState}`);
             dataPc.oniceconnectionstatechange = () => {
+                ui.logUI(`dataPc ICE state becomes ${dataPc.iceConnectionState}`);
                 if (dataPc.iceConnectionState === 'connected') {
                     ui.logUI('seems connected, trying to create datachannel');
                     dataChannel = dataPc.createDataChannel('signaling', { 
@@ -153,15 +169,14 @@ const business = {
                         ui.showVideoControls();
                     };
                     dataChannel.onmessage = business.handleDataChannelMessage;
-                } else {
-                    ui.logUI(`dataPc ICE state becomes ${dataPc.iceConnectionState}`);
                 }
             };
             
             // Minimal SDP - NO MEDIA
             const offer = await dataPc.createOffer({
                 offerToReceiveAudio: 0,
-                offerToReceiveVideo: 0
+                offerToReceiveVideo: 0,
+                iceRestart: false,
             });
             await dataPc.setLocalDescription(offer);
             ui.logUI(`✅ Offer ready. State: ${dataPc.signalingState}`);
@@ -315,8 +330,11 @@ const business = {
                 ui.updateStatus(`❌ Wrong state: ${dataPc.signalingState}, expected 'have-local-offer'`);
                 return;
             }
+
+            ui.logUI(`BEFORE setRemote: signaling=${dataPc.signalingState}, ice=${dataPc.iceConnectionState}`);
             
             await dataPc.setRemoteDescription({ type: 'answer', sdp: fullSdp });
+            ui.logUI(`AFTER setRemote: signaling=${dataPc.signalingState}, ice=${dataPc.iceConnectionState}`);
             ui.logUI(`✅ Connected! State: ${dataPc.signalingState}`);
             ui.updateStatus('✅ P2P Connected!');
             // Create signaling data channel
