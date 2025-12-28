@@ -454,6 +454,3 @@ window.business = {
         }
     }
 };
-
-
-ui.elements.testCircBtn.addEventListener('click', window.business.testCircuitRelays);

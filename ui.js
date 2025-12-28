@@ -29,6 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         elements.resetBtn.addEventListener('click', ui.resetUI);
+
+        elements.testCircBtn.addEventListener('click', window.business.testCircuitRelays);
         
         // Theme sync
     updateTheme();  // Initial theme
