@@ -1,12 +1,13 @@
 // Global state
 
 import { ui } from './ui.js';
-const { circuitRelayTransport, circuitRelayServer } = window.Libp2PCircuitRelayV2;
+const { circuitRelayTransport } = window.Libp2PCircuitRelayV2;
 const { createLibp2p } = window.Libp2P; 
 const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
 const { identify } = window.Libp2PIdentify;
 const { bootstrap } = window.Libp2PBootstrap;
+const { kadDHT,removePrivateAddressesMapper } = window.Libp2PKadDht;
 let dataPc = null;
 let mediaPc = null;
 let localStream = null;
@@ -391,6 +392,10 @@ async testCircuitRelays() {
             })
     ],
     services: {
+        lanDHT: kadDHT({
+            protocol: '/ipfs/kad/1.0.0',
+            peerInfoMapper: removePrivateAddressesMapper,
+          }),
       identify: identify()
     }
   });
