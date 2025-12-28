@@ -372,7 +372,7 @@ async testCircuitRelays() {
   node = await createLibp2p({
     start:false,
     addresses: {
-      listen: ['/p2p-circuit']
+      listen: ['/p2p-circuit', '/ip4/127.0.0.1/tcp/8000/ws']
     },
     transports: [
       circuitRelayTransport(),
