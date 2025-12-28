@@ -3,7 +3,6 @@
 import { ui } from './ui.js';
 import pako from 'pako';
 import { createLibp2p } from 'libp2p';
-import { webRTC } from 'libp2p-webrtc';
 import { circuitRelayTransport } from 'libp2p-circuit';
 import { noise } from 'libp2p-noise';
 import { yamux } from 'libp2p-yamux';
@@ -104,7 +103,6 @@ async function testRelayConnection(relayMultiaddr) {
       listen: ['/webrtc']
     },
     transports: [
-      webRTC(),
       circuitRelayTransport()
     ],
     connectionEncryption: [noise()],
