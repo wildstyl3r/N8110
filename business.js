@@ -103,10 +103,11 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
           if (hasSrflx) {
             console.log(`  ✅ ${stunUrl} - WORKING (srflx candidate received)`);
 
-          resolve();
           } else {
             console.log(`  ❌ ${stunUrl} - FAILED (no srflx candidates)`);
           }
+
+          resolve();
         }
       };
 
@@ -115,7 +116,10 @@ async function testSTUNServers(domainList=stunDomains, timeout = 5000) {
       
       // Create data channel to trigger ICE gathering
       pc.createDataChannel('test');
-      pc.createOffer().then(offer => pc.setLocalDescription(offer))
+      pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true,
+            }).then(offer => pc.setLocalDescription(offer))
       .then(() => {
           // Force gathering complete check after short delay
           setTimeout(checkGatheringComplete, 100);
