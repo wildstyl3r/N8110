@@ -7,6 +7,7 @@ const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
 const { identify } = window.Libp2PIdentify;
 const { bootstrap } = window.Libp2PBootstrap;
+const { ping } = window.Libp2PPing;
 const { kadDHT,removePrivateAddressesMapper } = window.Libp2PKadDht;
 let dataPc = null;
 let mediaPc = null;
@@ -396,7 +397,8 @@ async testCircuitRelays() {
             protocol: '/ipfs/kad/1.0.0',
             peerInfoMapper: removePrivateAddressesMapper,
           }),
-      identify: identify()
+        ping: ping(),
+        identify: identify()
     }
   });
   node.addEventListener('peer:discovery', (evt) => {
