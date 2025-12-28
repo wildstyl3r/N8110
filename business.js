@@ -6,6 +6,7 @@ const { createLibp2p } = window.Libp2P;
 const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
 const { identify } = window.Libp2PIdentify;
+const { bootstrap } = window.Libp2PBootstrap;
 let dataPc = null;
 let mediaPc = null;
 let localStream = null;
@@ -406,11 +407,28 @@ async testRelayConnection(relayMultiaddr) {
     ],
     connectionEncryption: [noise()],
     streamMuxers: [yamux()],
-    peerDiscovery: [],
+    peerDiscovery: [
+         bootstrap({
+            list: [ // a list of bootstrap peer multiaddrs to connect to on node startup
+                "/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+                "/dnsaddr/bootstrap.libp2p.io/ipfs/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+                "/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
+                "/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt",
+                "/dnsaddr/bootstrap.libp2p.io/ipfs/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa"
+            ],
+            timeout: 1000, // in ms,
+            tagName: 'bootstrap',
+            tagValue: 50,
+            tagTTL: 120000 // in ms
+            })
+    ],
     services: {
       identify: identify()
     }
   });
+  node.addEventListener('peer:discovery', (evt) => {
+  console.log('found peer: ', evt.detail.toString())
+})
   
   try {
     await node.start();
