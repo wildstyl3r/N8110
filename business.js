@@ -1,7 +1,7 @@
 // Global state
 
 import { ui } from './ui.js';
-const { circuitRelayTransport, relay } = window.Libp2PCircuitRelayV2;
+const { circuitRelayTransport, circuitRelayServer } = window.Libp2PCircuitRelayV2;
 const { createLibp2p } = window.Libp2P; 
 const { noise } = window.ChainsafeLibp2PNoise;
 const { yamux } = window.ChainsafeLibp2PYamux;
@@ -407,7 +407,7 @@ async testRelayConnection(relayMultiaddr) {
     streamMuxers: [yamux()],
     peerDiscovery: [],
     services: {
-      relay: relay()
+      relay: circuitRelayServer()
     }
   });
   
