@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.style.transform = 'translateZ(0)';
             });
         }
+
+        elements.resetBtn.addEventListener('click', ui.resetUI);
         
         // Theme sync
     updateTheme();  // Initial theme
@@ -121,9 +123,7 @@ function logUI(message, data = null) {
     console.log(line, data);
 }
 
-// Event Listeners
-
-elements.resetBtn.addEventListener('click', ui.resetUI);
+// Event Listener
 
 elements.useDataBtn.addEventListener('click', async () => {
     elements.useDataBtn.disabled = true;
